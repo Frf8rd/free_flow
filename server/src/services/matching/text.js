@@ -10,7 +10,7 @@ function normalize(input) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{M}+/gu, '')
-    .replace(/[^\p{L}\p{N}+#.\s]/gu, ' ')
+    .replace(/[^\p{L}\p{N}+#.€\s]/gu, ' ')
     .replace(/(?<![\p{L}\p{N}])\.|\.(?![\p{L}\p{N}])/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
