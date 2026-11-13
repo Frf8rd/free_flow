@@ -2,6 +2,7 @@ const { randomBytes } = require("node:crypto");
 const prisma = require("../config/prisma");
 const { signAccessToken } = require("../utils/jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("../utils/hash");
+const { isAdminAllowlisted } = require("../utils/adminAccess");
 const { AppError } = require("../utils/errors");
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -124,6 +125,9 @@ async function login(input) {
   if (!user || user.isBlocked || !passwordMatches) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Email sau parolă incorectă.");
   }
+  if (user.role === "ADMIN" && !(await isAdminAllowlisted(user.email))) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Email sau parolă incorectă.");
+  }
 
   const { passwordHash, isBlocked, ...safeUser } = user;
   return createSession(safeUser, prisma, user.tokenVersion);
@@ -236,6 +240,12 @@ async function loginWithProvider(provider, input) {
         if (linkedAccount.user.isBlocked) {
           throw new AppError(403, "ACCOUNT_BLOCKED", "Contul este dezactivat.");
         }
+        if (
+          linkedAccount.user.role === "ADMIN" &&
+          !(await isAdminAllowlisted(linkedAccount.user.email, tx))
+        ) {
+          throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Contul nu este autorizat ca administrator.");
+        }
         const { passwordHash, isBlocked, ...safeUser } = linkedAccount.user;
         return createSession(safeUser, tx, linkedAccount.user.tokenVersion);
       }
@@ -279,6 +289,12 @@ async function loginWithProvider(provider, input) {
         include: { user: true },
       });
       if (linkedAccount && !linkedAccount.user.isBlocked) {
+        if (
+          linkedAccount.user.role === "ADMIN" &&
+          !(await isAdminAllowlisted(linkedAccount.user.email))
+        ) {
+          throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Contul nu este autorizat ca administrator.");
+        }
         const { passwordHash, isBlocked, ...safeUser } = linkedAccount.user;
         return createSession(safeUser, prisma, linkedAccount.user.tokenVersion);
       }
@@ -303,7 +319,8 @@ async function refresh(refreshToken) {
       !stored ||
       stored.revokedAt ||
       stored.expiresAt <= new Date() ||
-      stored.user.isBlocked
+      stored.user.isBlocked ||
+      (stored.user.role === "ADMIN" && !(await isAdminAllowlisted(stored.user.email, tx)))
     ) {
       throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token invalid sau expirat.");
     }

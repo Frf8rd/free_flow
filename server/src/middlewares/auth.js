@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const { verifyAccessToken } = require("../utils/jwt");
+const { isAdminAllowlisted } = require("../utils/adminAccess");
 
 async function authenticate(req, res, next) {
   const authorization = req.get("authorization") || "";
@@ -28,6 +29,9 @@ async function authenticate(req, res, next) {
     });
     if (!user || user.isBlocked || claims.tokenVersion !== user.tokenVersion) {
       return res.status(401).json({ error: { code: "INVALID_TOKEN", message: "Sesiune invalidă sau expirată." } });
+    }
+    if (user.role === "ADMIN" && !(await isAdminAllowlisted(user.email))) {
+      return res.status(403).json({ error: { code: "FORBIDDEN", message: "Contul nu este autorizat ca administrator." } });
     }
 
     req.user = user;

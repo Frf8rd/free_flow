@@ -30,8 +30,15 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  adminAccess  Admin?
   refreshTokens RefreshToken[]
   oauthAccounts OAuthAccount[]
+}
+
+model Admin {
+  email     String   @id
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [email], references: [email], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model RefreshToken {

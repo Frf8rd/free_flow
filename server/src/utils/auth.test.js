@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { signAccessToken, verifyAccessToken } = require("./jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("./hash");
+const { isAdminAllowlisted } = require("./adminAccess");
 const { requireRole } = require("../middlewares/requireRole");
 const {
   REFRESH_COOKIE_MAX_AGE_SECONDS,
@@ -38,6 +39,23 @@ test("refresh tokens are stored as one-way hashes", () => {
   assert.notEqual(hash, token);
   assert.equal(hashRefreshToken(token), hash);
   assert.notEqual(hashRefreshToken(token), hashRefreshToken("another-token"));
+});
+
+test("admin access requires a normalized email in the admin allowlist", async () => {
+  const queries = [];
+  const db = {
+    admin: {
+      findUnique: async (query) => {
+        queries.push(query);
+        return query.where.email === "admin@example.com" ? { email: "admin@example.com" } : null;
+      },
+    },
+  };
+
+  assert.equal(await isAdminAllowlisted(" Admin@Example.com ", db), true);
+  assert.equal(await isAdminAllowlisted("user@example.com", db), false);
+  assert.equal(await isAdminAllowlisted(null, db), false);
+  assert.equal(queries[0].where.email, "admin@example.com");
 });
 
 test("refresh cookie is HttpOnly, SameSite, path-scoped, and readable by the refresh handler", () => {
