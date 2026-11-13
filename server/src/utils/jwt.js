@@ -56,7 +56,11 @@ function verifyAccessToken(token) {
   } catch {
     return null;
   }
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
+  if (
+    actual.length !== expected.length ||
+    actual.toString("base64url") !== signature ||
+    !timingSafeEqual(actual, expected)
+  ) return null;
   if (typeof payload.sub !== "string" || !payload.sub) return null;
   if (!Number.isInteger(payload.ver) || payload.ver < 0) return null;
   if (!Number.isInteger(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null;

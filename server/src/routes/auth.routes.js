@@ -4,17 +4,27 @@ const { authenticate } = require("../middlewares/auth");
 const { rateLimit } = require("../middlewares/rateLimit");
 const authService = require("../services/auth.service");
 const { verifyPassword, hashPassword } = require("../utils/hash");
+const { getRefreshToken, setRefreshCookie, clearRefreshCookie } = require("../utils/refreshCookie");
 
 const router = Router();
 const loginLimiter = rateLimit({ max: 10 });
+const refreshLimiter = rateLimit({ max: 60 });
+
+function respondWithSession(res, session, status = 200) {
+  setRefreshCookie(res, session.refreshToken);
+  res.status(status).json({
+    user: session.user,
+    accessToken: session.accessToken,
+  });
+}
 
 router.post("/register", loginLimiter, async (req, res) => {
   const session = await authService.register(req.body);
-  res.status(201).json(session);
+  respondWithSession(res, session, 201);
 });
 
 router.post("/login", loginLimiter, async (req, res) => {
-  res.json(await authService.login(req.body));
+  respondWithSession(res, await authService.login(req.body));
 });
 
 router.post("/oauth/:provider/challenge", loginLimiter, async (req, res) => {
@@ -23,15 +33,17 @@ router.post("/oauth/:provider/challenge", loginLimiter, async (req, res) => {
 
 router.post("/oauth/:provider", loginLimiter, async (req, res) => {
   const session = await authService.loginWithProvider(req.params.provider, req.body);
-  res.json(session);
+  respondWithSession(res, session);
 });
 
-router.post("/refresh", loginLimiter, async (req, res) => {
-  res.json(await authService.refresh(req.body && req.body.refreshToken));
+router.post("/refresh", refreshLimiter, async (req, res) => {
+  const session = await authService.refresh(getRefreshToken(req));
+  respondWithSession(res, session);
 });
 
 router.post("/logout", authenticate, async (req, res) => {
   await authService.logout(req.user.id);
+  clearRefreshCookie(res);
   res.status(204).end();
 });
 
@@ -71,6 +83,7 @@ router.post("/change-password", authenticate, async (req, res) => {
       data: { revokedAt: new Date() },
     }),
   ]);
+  clearRefreshCookie(res);
   res.status(204).end();
 });
 

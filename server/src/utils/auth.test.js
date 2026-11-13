@@ -3,6 +3,12 @@ const assert = require("node:assert/strict");
 const { signAccessToken, verifyAccessToken } = require("./jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("./hash");
 const { requireRole } = require("../middlewares/requireRole");
+const {
+  REFRESH_COOKIE_MAX_AGE_SECONDS,
+  getRefreshToken,
+  setRefreshCookie,
+  clearRefreshCookie,
+} = require("./refreshCookie");
 
 process.env.JWT_SECRET = "test-only-secret-that-is-at-least-32-bytes-long";
 
@@ -34,6 +40,24 @@ test("refresh tokens are stored as one-way hashes", () => {
   assert.notEqual(hashRefreshToken(token), hashRefreshToken("another-token"));
 });
 
+test("refresh cookie is HttpOnly, SameSite, path-scoped, and readable by the refresh handler", () => {
+  let cookie;
+  const response = { append: (name, value) => {
+    assert.equal(name, "Set-Cookie");
+    cookie = value;
+  } };
+  const refreshToken = "random-refresh-token";
+  setRefreshCookie(response, refreshToken);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Lax/);
+  assert.match(cookie, /Path=\/api\/auth/);
+  assert.match(cookie, new RegExp(`Max-Age=${REFRESH_COOKIE_MAX_AGE_SECONDS}`));
+  assert.equal(getRefreshToken({ headers: { cookie } }), refreshToken);
+
+  clearRefreshCookie(response);
+  assert.match(cookie, /Max-Age=0/);
+});
+
 test("role middleware denies missing or mismatched roles", () => {
   const invoke = (user, roles) => {
     let status;
@@ -55,6 +79,8 @@ test("role middleware denies missing or mismatched roles", () => {
 
   assert.equal(invoke(null, ["CLIENT"]).status, 401);
   assert.equal(invoke({ role: "FREELANCER" }, ["CLIENT"]).status, 403);
+  assert.equal(invoke({ role: "CLIENT" }, ["ADMIN"]).status, 403);
+  assert.equal(invoke({ role: "ADMIN" }, ["CLIENT"]).status, 403);
   assert.deepEqual(invoke({ role: "CLIENT" }, ["CLIENT"]), {
     status: undefined,
     payload: undefined,

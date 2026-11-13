@@ -120,10 +120,7 @@ async function login(input) {
 
   const email = input.email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
-  const passwordMatches = await verifyPassword(
-    input.password,
-    user ? user.passwordHash : "",
-  );
+  const passwordMatches = await verifyPassword(input.password, user?.passwordHash || "");
   if (!user || user.isBlocked || !passwordMatches) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Email sau parolă incorectă.");
   }
