@@ -1,5 +1,18 @@
 require('dotenv').config();
-const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
+
+// Găsește clientul Prisma generat (calea depinde de `output` din schema.prisma)
+function loadPrismaClient() {
+  const dir = path.join(__dirname, '..', 'src', 'generated', 'prisma');
+  const candidates = ['client.ts', 'client.js', 'index.js'];
+  for (const file of candidates) {
+    const full = path.join(dir, file);
+    if (fs.existsSync(full)) return require(full);
+  }
+  return require('@prisma/client');
+}
+const { PrismaClient } = loadPrismaClient();
 const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
