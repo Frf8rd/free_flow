@@ -1,25 +1,24 @@
 import MatchCard from '../components/match/MatchCard'
 
-// Date de test. Mai târziu vin de la backend: GET /projects/:id/matches
 const matches = [
   {
     id: 1,
     name: 'Nume Prenume',
+    initials: 'AN',
     tier: 'Start',
     rising: true,
-    headline: 'Frontend developer',
-    rate: 15,
-    skills: ['React', 'UI', 'Figma'],
+    headline: 'Frontend developer · 15 €/h · disponibil acum',
+    skills: ['React', 'Figma', 'CSS'],
     why: 'abilități comune, preț în buget, disponibil în termen.',
     score: 92,
   },
   {
     id: 2,
     name: 'Nume Prenume',
+    initials: 'MB',
     tier: 'Verificat',
     rising: false,
-    headline: 'Web designer',
-    rate: 20,
+    headline: 'Web designer · 20 €/h · disponibil în 3 zile',
     skills: ['Figma', 'CSS', 'Branding'],
     why: 'experiență în proiecte similare, preț ușor peste buget.',
     score: 85,
@@ -27,40 +26,37 @@ const matches = [
   {
     id: 3,
     name: 'Nume Prenume',
+    initials: 'CD',
     tier: 'Încercat',
     rising: false,
-    headline: 'Full-stack developer',
-    rate: 25,
+    headline: 'Full-stack developer · 25 €/h · disponibil în 2 săptămâni',
     skills: ['React', 'Node.js'],
-    why: 'abilități tehnice potrivite, disponibil peste două săptămâni.',
+    why: 'abilități tehnice potrivite, termen mai lung.',
     score: 78,
   },
 ]
 
 export default function Recommendations() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold">
-        Potriviri pentru: „Site pentru frizerie"
-      </h1>
-      <p className="mb-5 mt-1 text-sm text-slate-500">
-        Stare: se caută potriviri… / 3 rezultate
-      </p>
-
-      <div className="mb-5 rounded-lg border border-dashed border-slate-400 bg-slate-100 p-4">
-        <p>
-          <b>Întrebare de clarificare</b>{' '}
-          <span className="text-slate-500">(doar dacă brief-ul e vag)</span>
-        </p>
-        <input
-          placeholder="Răspunsul tău"
-          className="mt-3 w-full rounded-md border border-slate-400 bg-white px-3 py-2 text-sm focus:outline-none"
-        />
+    <div className="recommendations-page">
+      <div className="page-header">
+        <div>
+          <p className="page-label">Proiectul tău</p>
+          <h1>Site pentru frizerie</h1>
+        </div>
+        <span className="result-pill">{matches.length} potriviri găsite</span>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {matches.map((m) => (
-          <MatchCard key={m.id} match={m} />
+      <div className="filters-row" aria-label="Filter options">
+        <button className="filter-chip active">Toate</button>
+        <button className="filter-chip">Talent în creștere</button>
+        <button className="filter-chip">Sub buget</button>
+        <button className="filter-chip">Disponibil acum</button>
+      </div>
+
+      <div className="matches-list">
+        {matches.map((match) => (
+          <MatchCard key={match.id} match={match} />
         ))}
       </div>
     </div>

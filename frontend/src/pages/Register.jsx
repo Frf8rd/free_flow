@@ -11,41 +11,35 @@ export default function Register() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-xl bg-white p-8 shadow">
-      <h1 className="mb-6 text-2xl font-bold">Creează cont</h1>
+    <div className="card mx-auto mt-6 max-w-md p-8">
+      <h1 className="mb-6 font-display text-3xl">Creează cont</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <select
-          defaultValue={role}
-          className="w-full rounded-lg border border-slate-300 px-4 py-2"
-        >
-          <option value="client">Client</option>
-          <option value="freelancer">Freelancer</option>
-        </select>
-        <input
-          type="text"
-          placeholder="Nume"
-          className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-primary focus:outline-none"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-primary focus:outline-none"
-        />
-        <input
-          type="password"
-          placeholder="Parolă"
-          className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-primary focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="w-full rounded-lg bg-primary py-2 font-semibold text-white hover:bg-primary-dark"
-        >
+        <label className="block text-sm font-semibold">
+          Rol
+          <select defaultValue={role} className="input mt-1.5 font-normal">
+            <option value="client">Client</option>
+            <option value="freelancer">Freelancer</option>
+          </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Nume
+          <input type="text" placeholder="Numele tău" className="input mt-1.5 font-normal" />
+        </label>
+        <label className="block text-sm font-semibold">
+          Email
+          <input type="email" placeholder="email@exemplu.ro" className="input mt-1.5 font-normal" />
+        </label>
+        <label className="block text-sm font-semibold">
+          Parolă
+          <input type="password" placeholder="Parola ta" className="input mt-1.5 font-normal" />
+        </label>
+        <button type="submit" className="btn-primary w-full">
           Înregistrează-te
         </button>
       </form>
-      <p className="mt-4 text-sm text-slate-600">
+      <p className="mt-5 text-sm text-mute">
         Ai deja cont?{' '}
-        <Link to="/login" className="text-primary hover:underline">
+        <Link to="/login" className="font-semibold text-brand hover:underline">
           Autentifică-te
         </Link>
       </p>
