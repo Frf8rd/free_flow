@@ -47,6 +47,12 @@ router.post("/logout", authenticate, async (req, res) => {
   res.status(204).end();
 });
 
+router.delete("/me", authenticate, async (req, res) => {
+  await prisma.user.delete({ where: { id: req.user.id } });
+  clearRefreshCookie(res);
+  res.status(204).end();
+});
+
 router.post("/change-password", authenticate, async (req, res) => {
   const { oldPassword, newPassword } = req.body || {};
   if (
