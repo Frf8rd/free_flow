@@ -47,7 +47,7 @@ function extractDeadline(text, explicitDeadline, now) {
 
   const exact = text.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b/);
   if (exact) {
-    const date = new Date(Number(exact[3]), Number(exact[2]) - 1, Number(exact[1]));
+    const date = new Date(Date.UTC(Number(exact[3]), Number(exact[2]) - 1, Number(exact[1])));
     if (date.getFullYear() === Number(exact[3]) && date.getMonth() === Number(exact[2]) - 1 && date.getDate() === Number(exact[1])) {
       return date;
     }
@@ -59,7 +59,7 @@ function extractDeadline(text, explicitDeadline, now) {
   const unit = relative[2];
   const days = /saptamani|weeks?/u.test(unit) ? amount * 7 : amount;
   const date = new Date(now);
-  date.setDate(date.getDate() + days);
+  date.setUTCDate(date.getUTCDate() + days);
   return date;
 }
 

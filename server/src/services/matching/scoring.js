@@ -57,7 +57,7 @@ function scoreSkills(project = {}, freelancer = {}) {
   };
 }
 
-function portfolioEvidence(project, freelancer, config) {
+function portfolioEvidence(project, freelancer, skills, config) {
   const skillPhrases = (project.skills ?? []).map((skill) => normalize(skill.name)).filter(Boolean);
   const titleTokens = new Set(tokenize(`${project.title ?? ''} ${project.categoryName ?? ''}`));
   let sum = 0;
@@ -136,7 +136,7 @@ function scoreFreelancerForProject(project, freelancer, config = MATCHING_CONFIG
   const levelDifference = levelIndex(freelancer.level) - levelIndex(project.requiredLevel);
   if (levelDifference < -config.filters.maxLevelGap) return fail('LEVEL_TOO_LOW');
 
-  const evidence = portfolioEvidence(project, freelancer, config);
+  const evidence = portfolioEvidence(project, freelancer, skills, config);
   if (!skills.categoryOnly && skills.matchedSkills.length === 0 && evidence.relevantPortfolio === 0) {
     return fail('NO_RELEVANT_SKILLS');
   }
@@ -229,4 +229,43 @@ function rankFreelancers(project, freelancers, config = MATCHING_CONFIG, fairnes
   });
 }
 
-module.exports = { scoreSkills, scoreFreelancerForProject, rankFreelancers, estimateCost };
+function rankProjectsForFreelancer(freelancer, projects, config = MATCHING_CONFIG, fairnessContext = {}) {
+  const now = fairnessContext.now instanceof Date ? fairnessContext.now : new Date();
+  const exposureById = fairnessContext.exposureById ?? {};
+  const evaluated = (Array.isArray(projects) ? projects : [])
+    .map((project) => ({ project, result: scoreFreelancerForProject(project, freelancer, config, now) }))
+    .filter((item) => item.result.eligible)
+    .map(({ project, result }) => {
+      const exposure = exposureById[project.id] ?? {};
+      return {
+        key: project.id,
+        score: result.score,
+        ref: { project, result },
+        ...exposure,
+        isNewcomer: (exposure.exposure ?? 0) <= config.fairnessFreelancerSide.lowExposure,
+      };
+    });
+  const fair = applyFairness(evaluated, {
+    ...config.fairnessFreelancerSide,
+    ...fairnessContext,
+    maxActive: config.fairnessFreelancerSide.maxActivePerProject,
+  });
+  return fair.slice(0, config.limits.matchesPerFreelancer).map((candidate) => {
+    const { project, result } = candidate.ref;
+    return {
+      project,
+      ...result,
+      rank: candidate.rank,
+      exploration: candidate.exploration,
+      reasons: buildReasons(result, project, freelancer, { exploration: candidate.exploration }),
+    };
+  });
+}
+
+module.exports = {
+  scoreSkills,
+  scoreFreelancerForProject,
+  rankFreelancers,
+  rankProjectsForFreelancer,
+  estimateCost,
+};

@@ -31,10 +31,20 @@ const MATCHING_CONFIG = Object.freeze({
     lowExposure: 2,
     maxActivePerFreelancer: 15,
   }),
+  fairnessFreelancerSide: Object.freeze({
+    topK: 5,
+    explorationSlots: 1,
+    explorationMinScore: 50,
+    explorationBand: 20,
+    mainBand: 5,
+    newcomerReviews: 3,
+    lowExposure: 2,
+    maxActivePerProject: 10,
+  }),
   limits: Object.freeze({
     candidates: 300,
     matchesPerProject: 50,
-    matchesPerFreelancer: 50,
+    matchesPerFreelancer: 30,
     notifyTop: 5,
   }),
   // Estimări inițiale, folosite doar când brief-ul nu conține durata.
@@ -47,6 +57,21 @@ const MATCHING_CONFIG = Object.freeze({
     apiKey: process.env.MATCH_LLM_API_KEY || '',
     timeoutMs: Number(process.env.MATCH_LLM_TIMEOUT_MS) || 20000,
     maxDescriptionChars: 4000,
+  }),
+  embeddings: Object.freeze({
+    enabled: Boolean(process.env.MATCH_EMBED_MODEL && process.env.MATCH_EMBED_BASE_URL
+      && (process.env.MATCH_EMBED_API_KEY || process.env.MATCH_EMBED_BASE_URL === process.env.MATCH_LLM_BASE_URL))
+      && process.env.MATCH_EMBED_ENABLED !== 'false',
+    baseURL: process.env.MATCH_EMBED_BASE_URL || process.env.MATCH_LLM_BASE_URL || '',
+    model: process.env.MATCH_EMBED_MODEL || '',
+    apiKey: process.env.MATCH_EMBED_API_KEY
+      || (process.env.MATCH_EMBED_BASE_URL === process.env.MATCH_LLM_BASE_URL ? process.env.MATCH_LLM_API_KEY : '')
+      || '',
+    dimensions: Number(process.env.MATCH_EMBED_DIMENSIONS) || 256,
+    timeoutMs: Number(process.env.MATCH_EMBED_TIMEOUT_MS) || 20000,
+    batchSize: 32,
+    minSimilarity: Number(process.env.MATCH_EMBED_MIN_SIM) || 0.55,
+    fullSimilarity: Number(process.env.MATCH_EMBED_FULL_SIM) || 0.75,
   }),
 });
 
