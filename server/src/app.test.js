@@ -34,6 +34,15 @@ test("health and protected authentication routes return expected access control"
     const protectedRoleRoute = await fetch(`${baseUrl}/access/client`);
     assert.equal(protectedRoleRoute.status, 401);
 
+    const protectedProjects = await fetch(`${baseUrl}/projects`);
+    assert.equal(protectedProjects.status, 401);
+    const createProject = await fetch(`${baseUrl}/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Test" }),
+    });
+    assert.equal(createProject.status, 401);
+
     const missingRefreshCookie = await fetch(`${baseUrl}/auth/refresh`, { method: "POST" });
     assert.equal(missingRefreshCookie.status, 401);
   });
@@ -98,6 +107,16 @@ test("social login reports missing Google configuration instead of accepting an 
     });
     assert.equal(response.status, 503);
     assert.equal((await response.json()).error.code, "PROVIDER_NOT_CONFIGURED");
+  });
+});
+
+test("Apple OAuth endpoints are not exposed", async (t) => {
+  await withServer(t, async (baseUrl) => {
+    const challenge = await fetch(`${baseUrl}/auth/oauth/apple/challenge`, { method: "POST" });
+    const login = await fetch(`${baseUrl}/auth/oauth/apple`, { method: "POST" });
+
+    assert.equal(challenge.status, 404);
+    assert.equal(login.status, 404);
   });
 });
 

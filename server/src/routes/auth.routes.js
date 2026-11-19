@@ -27,12 +27,12 @@ router.post("/login", loginLimiter, async (req, res) => {
   respondWithSession(res, await authService.login(req.body));
 });
 
-router.post("/oauth/:provider/challenge", loginLimiter, async (req, res) => {
-  res.json(await authService.createOAuthChallenge(req.params.provider));
+router.post("/oauth/google/challenge", loginLimiter, async (req, res) => {
+  res.json(await authService.createOAuthChallenge("google"));
 });
 
-router.post("/oauth/:provider", loginLimiter, async (req, res) => {
-  const session = await authService.loginWithProvider(req.params.provider, req.body);
+router.post("/oauth/google", loginLimiter, async (req, res) => {
+  const session = await authService.loginWithProvider("google", req.body);
   respondWithSession(res, session);
 });
 

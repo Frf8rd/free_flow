@@ -20,12 +20,6 @@ const providerConfig = {
     issuer: ["https://accounts.google.com", "accounts.google.com"],
     jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
   },
-  apple: {
-    prismaProvider: "APPLE",
-    clientIdEnv: "APPLE_CLIENT_ID",
-    issuer: "https://appleid.apple.com",
-    jwksUrl: "https://appleid.apple.com/auth/keys",
-  },
 };
 const remoteKeys = new Map();
 
@@ -224,13 +218,7 @@ async function loginWithProvider(provider, input) {
   const claims = await verifyProviderCredential(provider, input.credential, input.nonce);
   const nonceHash = hashRefreshToken(input.nonce);
   const email = claims.email.trim().toLowerCase();
-  const displayName =
-    (provider === "google" && typeof claims.name === "string" && claims.name) ||
-    (provider === "apple" && typeof input.name === "string" && input.name) ||
-    (provider === "apple" &&
-      input.name &&
-      [input.name.firstName, input.name.lastName].filter((part) => typeof part === "string").join(" ")) ||
-    email.split("@")[0];
+  const displayName = (typeof claims.name === "string" && claims.name) || email.split("@")[0];
   const name = displayName.trim().slice(0, 80) || email.split("@")[0];
 
   const consumed = await prisma.oAuthChallenge.updateMany({
