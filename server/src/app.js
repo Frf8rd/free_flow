@@ -30,6 +30,11 @@ app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "no-referrer");
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.set("X-DNS-Prefetch-Control", "off");
+  if (process.env.NODE_ENV === "production") {
+    res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   if (req.method === "OPTIONS") return res.status(204).end();
   return next();
 });

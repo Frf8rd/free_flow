@@ -24,22 +24,29 @@ enum ProjectStatus {
   CLOSED
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String?
-  name         String
-  role         Role
-  avatarUrl    String?
-  isBlocked    Boolean  @default(false)
-  tokenVersion Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum AccountTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
 
-  adminAccess  Admin?
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String?
+  name            String
+  role            Role
+  avatarUrl       String?
+  isBlocked       Boolean   @default(false)
+  tokenVersion    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  adminAccess   Admin?
   refreshTokens RefreshToken[]
   oauthAccounts OAuthAccount[]
   projects      Project[]
+  accountTokens AccountToken[]
 }
 
 model Admin {
@@ -134,4 +141,30 @@ model ProjectSkill {
   skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@id([projectId, skillId])
+}
+
+model AccountToken {
+  id         String              @id @default(cuid())
+  tokenHash  String              @unique
+  purpose    AccountTokenPurpose
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, purpose, expiresAt])
+}
+
+model PendingRegistration {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
 }

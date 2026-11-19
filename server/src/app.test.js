@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 process.env.JWT_SECRET = "test-only-secret-that-is-at-least-32-bytes-long";
 process.env.NODE_ENV = "test";
+process.env.SMTP_HOST = "";
 
 const app = require("./app");
 delete process.env.GOOGLE_CLIENT_ID;
@@ -21,6 +22,8 @@ test("health and protected authentication routes return expected access control"
     const health = await fetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
     assert.deepEqual(await health.json(), { status: "ok" });
+    assert.equal(health.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+    assert.equal(health.headers.get("x-dns-prefetch-control"), "off");
 
     const protectedRoute = await fetch(`${baseUrl}/auth/me`);
     assert.equal(protectedRoute.status, 401);
@@ -57,6 +60,40 @@ test("health and protected authentication routes return expected access control"
 
     const missingRefreshCookie = await fetch(`${baseUrl}/auth/refresh`, { method: "POST" });
     assert.equal(missingRefreshCookie.status, 401);
+  });
+});
+
+test("email security endpoints reject invalid input and fail explicitly when SMTP is unavailable", async (t) => {
+  await withServer(t, async (baseUrl) => {
+    const registration = await fetch(`${baseUrl}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Test User",
+        email: "test@example.com",
+        password: "a-secure-test-password",
+        role: "CLIENT",
+      }),
+    });
+    assert.equal(registration.status, 503);
+    assert.equal((await registration.json()).error.code, "EMAIL_NOT_CONFIGURED");
+    assert.equal(registration.headers.get("cache-control"), "no-store");
+
+    const verify = await fetch(`${baseUrl}/auth/email-verification/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: "invalid" }),
+    });
+    assert.equal(verify.status, 400);
+    assert.equal((await verify.json()).error.code, "INVALID_EMAIL_TOKEN");
+
+    const reset = await fetch(`${baseUrl}/auth/password-reset/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: "invalid", newPassword: "short" }),
+    });
+    assert.equal(reset.status, 400);
+    assert.equal((await reset.json()).error.code, "VALIDATION_ERROR");
   });
 });
 
@@ -119,6 +156,7 @@ test("social login reports missing Google configuration instead of accepting an 
     });
     assert.equal(response.status, 503);
     assert.equal((await response.json()).error.code, "PROVIDER_NOT_CONFIGURED");
+    assert.equal(response.headers.get("ratelimit-limit"), "100");
   });
 });
 

@@ -2,13 +2,51 @@ const { Router } = require("express");
 const prisma = require("../config/prisma");
 const { authenticate } = require("../middlewares/auth");
 const { rateLimit } = require("../middlewares/rateLimit");
+const { AppError } = require("../utils/errors");
+const { writeAuditLog } = require("../utils/auditLog");
 const authService = require("../services/auth.service");
-const { verifyPassword, hashPassword } = require("../utils/hash");
+const accountSecurity = require("../services/account-security.service");
 const { getRefreshToken, setRefreshCookie, clearRefreshCookie } = require("../utils/refreshCookie");
 
 const router = Router();
-const loginLimiter = rateLimit({ name: "auth-attempt", max: 10 });
+const loginLimiter = rateLimit({
+  name: "auth-attempt",
+  max: process.env.NODE_ENV === "production" ? 10 : 100,
+});
 const refreshLimiter = rateLimit({ name: "auth-refresh", max: 60 });
+const sensitiveActionLimiter = rateLimit({
+  name: "auth-sensitive-action",
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+});
+const emailVerificationLimiter = rateLimit({
+  name: "auth-email-verification",
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+});
+const passwordResetLimiter = rateLimit({
+  name: "auth-password-reset",
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+});
+
+router.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  res.set("Pragma", "no-cache");
+  next();
+});
+
+function getEmailInput(req) {
+  const email = req.body && req.body.email;
+  if (
+    typeof email !== "string" ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Adresa de email nu este validă.");
+  }
+  return email.trim().toLowerCase();
+}
 
 function respondWithSession(res, session, status = 200) {
   setRefreshCookie(res, session.refreshToken);
@@ -19,8 +57,8 @@ function respondWithSession(res, session, status = 200) {
 }
 
 router.post("/register", loginLimiter, async (req, res) => {
-  const session = await authService.register(req.body);
-  respondWithSession(res, session, 201);
+  const result = await authService.register(req.body);
+  res.status(201).json(result);
 });
 
 router.post("/login", loginLimiter, async (req, res) => {
@@ -41,65 +79,63 @@ router.post("/refresh", refreshLimiter, async (req, res) => {
   respondWithSession(res, session);
 });
 
+router.post("/email-verification/resend", emailVerificationLimiter, async (req, res) => {
+  res.json(await accountSecurity.requestEmailVerification(getEmailInput(req)));
+});
+
+router.post("/email-verification/confirm", emailVerificationLimiter, async (req, res) => {
+  const result = await authService.verifyEmail(req.body && req.body.token);
+  res.json({
+    email: result.email,
+    message: "Contul a fost verificat cu succes. Autentifică-te pentru a începe.",
+  });
+});
+
+router.post("/password-reset/request", passwordResetLimiter, async (req, res) => {
+  res.json(await accountSecurity.requestPasswordReset(getEmailInput(req)));
+});
+
+router.post("/password-reset/confirm", passwordResetLimiter, async (req, res) => {
+  await accountSecurity.resetPassword(
+    req.body && req.body.token,
+    req.body && req.body.newPassword,
+  );
+  res.json({ message: "Parola a fost resetată. Te poți autentifica." });
+});
+
 router.post("/logout", authenticate, async (req, res) => {
   await authService.logout(req.user.id);
   clearRefreshCookie(res);
   res.status(204).end();
 });
 
-router.delete("/me", authenticate, async (req, res) => {
-  await prisma.user.delete({ where: { id: req.user.id } });
+router.delete("/me", authenticate, sensitiveActionLimiter, async (req, res) => {
+  const actorId = req.user.id;
+  await authService.deleteAccount(actorId, req.body);
+  writeAuditLog("account.deleted", { actorId, resourceId: actorId });
   clearRefreshCookie(res);
   res.status(204).end();
 });
 
-router.post("/change-password", authenticate, async (req, res) => {
-  const { oldPassword, newPassword } = req.body || {};
-  if (
-    (oldPassword !== undefined && typeof oldPassword !== "string") ||
-    typeof newPassword !== "string" ||
-    newPassword.length < 12 ||
-    Buffer.byteLength(newPassword) > 256
-  ) {
-    return res.status(400).json({
-      error: { code: "VALIDATION_ERROR", message: "Parola nouă trebuie să aibă cel puțin 12 caractere." },
-    });
-  }
-
-  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  if (
-    !user ||
-    (user.passwordHash && !(await verifyPassword(oldPassword || "", user.passwordHash)))
-  ) {
-    return res.status(401).json({
-      error: { code: "INVALID_CREDENTIALS", message: "Parola curentă este incorectă." },
-    });
-  }
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: req.user.id },
-      data: {
-        passwordHash: await hashPassword(newPassword),
-        tokenVersion: { increment: 1 },
-      },
-    }),
-    prisma.refreshToken.updateMany({
-      where: { userId: req.user.id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    }),
-  ]);
+router.post("/change-password", authenticate, sensitiveActionLimiter, async (req, res) => {
+  await authService.changePassword(req.user.id, req.body);
+  writeAuditLog("account.password_changed", { actorId: req.user.id, resourceId: req.user.id });
   clearRefreshCookie(res);
   res.status(204).end();
 });
 
 router.get("/me", authenticate, async (req, res) => {
+  const credentials = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { passwordHash: true },
+  });
   const safeUser = {
     id: req.user.id,
     email: req.user.email,
     name: req.user.name,
     role: req.user.role,
     avatarUrl: req.user.avatarUrl,
+    hasPassword: Boolean(credentials && credentials.passwordHash),
   };
   res.json({ user: safeUser });
 });

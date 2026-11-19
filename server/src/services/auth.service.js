@@ -4,6 +4,8 @@ const { signAccessToken } = require("../utils/jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("../utils/hash");
 const { isAdminAllowlisted } = require("../utils/adminAccess");
 const { AppError } = require("../utils/errors");
+const { writeAuditLog } = require("../utils/auditLog");
+const accountSecurity = require("./account-security.service");
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const publicUserSelect = {
@@ -25,6 +27,17 @@ const remoteKeys = new Map();
 
 function createRefreshToken() {
   return randomBytes(48).toString("base64url");
+}
+
+function toSessionUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    hasPassword: Boolean(user.passwordHash),
+  };
 }
 
 function validateCredentials({ name, email, password, role }, registering) {
@@ -87,24 +100,42 @@ async function register(input) {
   const passwordHash = await hashPassword(input.password);
   const email = input.email.trim().toLowerCase();
   try {
-    return await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name: input.name.trim(),
-          email,
-          passwordHash,
-          role: input.role,
-        },
-        select: publicUserSelect,
-      });
-      return createSession(user, tx);
+    await accountSecurity.createPendingRegistration({
+      name: input.name.trim(),
+      email,
+      passwordHash,
+      role: input.role,
     });
+    return { emailVerificationRequired: true, email };
   } catch (error) {
+    if (error instanceof AppError) throw error;
     if (error && error.code === "P2002") {
-      throw new AppError(409, "EMAIL_IN_USE", "Nu s-a putut crea contul cu datele furnizate.");
+      throw new AppError(409, "EMAIL_IN_USE", "Această adresă de email este deja înregistrată.");
     }
     throw error;
   }
+}
+
+async function verifyEmail(token) {
+  const verifiedUser = await prisma.$transaction(async (tx) => {
+    const verification = await accountSecurity.consumeEmailVerification(tx, token);
+    return verification.registration
+      ? await tx.user.create({
+        data: {
+          name: verification.registration.name,
+          email: verification.registration.email,
+          passwordHash: verification.registration.passwordHash,
+          role: verification.registration.role,
+          emailVerifiedAt: new Date(),
+        },
+      })
+      : verification.user;
+  });
+  writeAuditLog("account.email_verified", {
+    actorId: verifiedUser.id,
+    resourceId: verifiedUser.id,
+  });
+  return { email: verifiedUser.email };
 }
 
 async function login(input) {
@@ -119,11 +150,14 @@ async function login(input) {
   if (!user || user.isBlocked || !passwordMatches) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Email sau parolă incorectă.");
   }
+  if (!user.emailVerifiedAt) {
+    throw new AppError(403, "EMAIL_NOT_VERIFIED", "Verifică adresa de email înainte de autentificare.");
+  }
   if (user.role === "ADMIN" && !(await isAdminAllowlisted(user.email))) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Email sau parolă incorectă.");
   }
 
-  const { passwordHash, isBlocked, ...safeUser } = user;
+  const safeUser = toSessionUser(user);
   return createSession(safeUser, prisma, user.tokenVersion);
 }
 
@@ -202,7 +236,13 @@ async function linkGoogleAccountToExistingAdmin(tx, user, providerUserId) {
       userId: user.id,
     },
   });
-  const { passwordHash, isBlocked, ...safeUser } = user;
+  const verifiedUser = user.emailVerifiedAt !== null
+    ? user
+    : await tx.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+  const safeUser = toSessionUser(verifiedUser);
   return createSession(safeUser, tx, user.tokenVersion);
 }
 
@@ -256,7 +296,13 @@ async function loginWithProvider(provider, input) {
         ) {
           throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Contul nu este autorizat ca administrator.");
         }
-        const { passwordHash, isBlocked, ...safeUser } = linkedAccount.user;
+        const linkedUser = linkedAccount.user.emailVerifiedAt !== null
+          ? linkedAccount.user
+          : await tx.user.update({
+            where: { id: linkedAccount.user.id },
+            data: { emailVerifiedAt: new Date() },
+          });
+        const safeUser = toSessionUser(linkedUser);
         return createSession(safeUser, tx, linkedAccount.user.tokenVersion);
       }
 
@@ -274,6 +320,7 @@ async function loginWithProvider(provider, input) {
           name,
           role: input.role,
           passwordHash: null,
+          emailVerifiedAt: new Date(),
           oauthAccounts: {
             create: {
               provider: config.prismaProvider,
@@ -283,7 +330,7 @@ async function loginWithProvider(provider, input) {
         },
         select: publicUserSelect,
       });
-      return createSession(user, tx);
+      return createSession(toSessionUser(user), tx);
     });
   } catch (error) {
     if (error instanceof AppError) throw error;
@@ -304,7 +351,7 @@ async function loginWithProvider(provider, input) {
         ) {
           throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Contul nu este autorizat ca administrator.");
         }
-        const { passwordHash, isBlocked, ...safeUser } = linkedAccount.user;
+        const safeUser = toSessionUser(linkedAccount.user);
         return createSession(safeUser, prisma, linkedAccount.user.tokenVersion);
       }
       throw new AppError(409, "ACCOUNT_LINK_REQUIRED", "Nu s-a putut asocia acest cont.");
@@ -342,9 +389,127 @@ async function refresh(refreshToken) {
       throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token invalid sau expirat.");
     }
 
-    const { passwordHash, isBlocked, ...safeUser } = stored.user;
+    const safeUser = toSessionUser(stored.user);
     return createSession(safeUser, tx, stored.user.tokenVersion);
   });
+}
+
+async function verifyGoogleReauthentication(userId, proof) {
+  if (!proof || typeof proof.credential !== "string" || typeof proof.nonce !== "string") {
+    throw new AppError(401, "REAUTHENTICATION_REQUIRED", "Reautentifică-te înainte de această operație.");
+  }
+  const config = getProvider("google");
+  const claims = await verifyProviderCredential("google", proof.credential, proof.nonce);
+  const consumed = await prisma.oAuthChallenge.updateMany({
+    where: {
+      provider: config.prismaProvider,
+      nonceHash: hashRefreshToken(proof.nonce),
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    data: { consumedAt: new Date() },
+  });
+  if (consumed.count !== 1) {
+    throw new AppError(401, "REAUTHENTICATION_REQUIRED", "Reautentifică-te înainte de această operație.");
+  }
+
+  const linkedAccount = await prisma.oAuthAccount.findUnique({
+    where: {
+      provider_providerUserId: {
+        provider: config.prismaProvider,
+        providerUserId: claims.sub,
+      },
+    },
+    select: { userId: true },
+  });
+  if (!linkedAccount || linkedAccount.userId !== userId) {
+    throw new AppError(401, "REAUTHENTICATION_FAILED", "Contul Google nu corespunde utilizatorului autentificat.");
+  }
+}
+
+function validateReauthenticationProof(proof) {
+  if (proof === undefined || proof === null) return;
+  if (typeof proof !== "object" || Array.isArray(proof)) {
+    throw new AppError(400, "VALIDATION_ERROR", "Date de reautentificare invalide.");
+  }
+
+  const allowedFields = new Set(["password", "credential", "nonce"]);
+  if (Object.keys(proof).some((field) => !allowedFields.has(field))) {
+    throw new AppError(400, "VALIDATION_ERROR", "Date de reautentificare invalide.");
+  }
+  if (
+    (proof.password !== undefined &&
+      (typeof proof.password !== "string" || Buffer.byteLength(proof.password) > 256)) ||
+    (proof.credential !== undefined &&
+      (typeof proof.credential !== "string" || proof.credential.length > 12_000)) ||
+    (proof.nonce !== undefined &&
+      (typeof proof.nonce !== "string" || !/^[A-Za-z0-9_-]{40,64}$/.test(proof.nonce))) ||
+    ((proof.credential === undefined) !== (proof.nonce === undefined)) ||
+    (proof.password !== undefined && proof.credential !== undefined)
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Date de reautentificare invalide.");
+  }
+}
+
+async function assertReauthentication(userId, proof) {
+  validateReauthenticationProof(proof);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+  if (!user) throw new AppError(401, "INVALID_TOKEN", "Sesiune invalidă sau expirată.");
+
+  if (user.passwordHash) {
+    if (
+      !proof ||
+      typeof proof.password !== "string" ||
+      !(await verifyPassword(proof.password, user.passwordHash))
+    ) {
+      throw new AppError(401, "REAUTHENTICATION_FAILED", "Parola curentă este incorectă.");
+    }
+    return;
+  }
+  await verifyGoogleReauthentication(userId, proof);
+}
+
+async function deleteAccount(userId, proof) {
+  await assertReauthentication(userId, proof);
+  await prisma.user.delete({ where: { id: userId } });
+}
+
+async function changePassword(userId, input) {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    Object.keys(input).some((field) => !["oldPassword", "newPassword", "credential", "nonce"].includes(field)) ||
+    typeof input.newPassword !== "string" ||
+    input.newPassword.length < 12 ||
+    Buffer.byteLength(input.newPassword) > 256 ||
+    (input.oldPassword !== undefined && typeof input.oldPassword !== "string")
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Parola nouă trebuie să aibă cel puțin 12 caractere.");
+  }
+
+  await assertReauthentication(userId, {
+    password: input.oldPassword,
+    credential: input.credential,
+    nonce: input.nonce,
+  });
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await hashPassword(input.newPassword),
+        tokenVersion: { increment: 1 },
+      },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: now },
+    }),
+  ]);
 }
 
 async function logout(userId) {
@@ -362,11 +527,15 @@ async function logout(userId) {
 
 module.exports = {
   register,
+  verifyEmail,
   login,
   loginWithProvider,
   createOAuthChallenge,
   linkGoogleAccountToExistingAdmin,
   refresh,
+  assertReauthentication,
+  deleteAccount,
+  changePassword,
   logout,
   publicUserSelect,
 };
