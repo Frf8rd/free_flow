@@ -9,8 +9,12 @@ async function list(req, res) {
   res.json({ data: await service.listEngagements(req.user) });
 }
 
-async function update(req, res) {
-  res.json({ data: await service.updateEngagement(req.user.id, req.params.id, req.body?.status) });
+async function getById(req, res) {
+  res.json({ data: await service.getEngagement(req.user, req.params.id) });
 }
 
-module.exports = { create, list, update };
+async function update(req, res) {
+  res.json({ data: await service.updateEngagement(req.user, req.params.id, req.body?.status) });
+}
+
+module.exports = { create, list, getById, update };

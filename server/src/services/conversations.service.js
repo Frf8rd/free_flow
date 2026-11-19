@@ -6,7 +6,7 @@ async function listConversations(userId, db = prisma) {
   const rows = await db.conversation.findMany({
     where,
     include: {
-      engagement: { include: { project: { select: { id: true, title: true } } } },
+      engagement: { select: { status: true, project: { select: { id: true, title: true } } } },
       client: { select: { id: true, name: true } },
       freelancer: { select: { id: true, name: true } },
       messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
@@ -36,8 +36,14 @@ async function sendMessage(userId, conversationId, input, db = prisma) {
   const content = typeof input?.content === "string" ? input.content.trim() : "";
   if (!content || content.length > 4000) throw new AppError(400, "VALIDATION_ERROR", "Mesajul trebuie să aibă între 1 și 4000 de caractere.");
   return db.$transaction(async (tx) => {
-    const conversation = await tx.conversation.findFirst({ where: { id: conversationId, OR: [{ clientId: userId }, { freelancerId: userId }] }, select: { id: true } });
+    const conversation = await tx.conversation.findFirst({
+      where: { id: conversationId, OR: [{ clientId: userId }, { freelancerId: userId }] },
+      select: { id: true, engagement: { select: { status: true } } },
+    });
     if (!conversation) throw new AppError(404, "CONVERSATION_NOT_FOUND", "Conversația nu a fost găsită.");
+    if (!["IN_PROGRESS", "DELIVERED"].includes(conversation.engagement.status)) {
+      throw new AppError(409, "CONVERSATION_CLOSED", "Nu mai poți trimite mesaje în această colaborare.");
+    }
     const message = await tx.message.create({ data: { conversationId, senderId: userId, content }, include: { sender: { select: { id: true, name: true } } } });
     await tx.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
     return message;

@@ -158,8 +158,11 @@ model Project {
 
 enum EngagementStatus {
   PENDING
-  ACCEPTED
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
   REJECTED
+  CANCELLED
 }
 
 model Engagement {
@@ -173,6 +176,10 @@ model Engagement {
   status       EngagementStatus @default(PENDING)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+  deliveredAt  DateTime?
+  completedAt  DateTime?
+  rejectedAt   DateTime?
+  cancelledAt  DateTime?
   conversation Conversation?
 
   @@unique([projectId, freelancerId])

@@ -8,8 +8,9 @@ const router = Router();
 const mutationLimiter = rateLimit({ name: "engagement-mutation", windowMs: 15 * 60 * 1000, max: 30 });
 
 router.use(authenticate);
-router.get("/", controller.list);
+router.get("/me", controller.list);
 router.post("/", requireRole("FREELANCER"), mutationLimiter, controller.create);
-router.patch("/:id", requireRole("CLIENT"), mutationLimiter, controller.update);
+router.get("/:id", controller.getById);
+router.patch("/:id/status", mutationLimiter, controller.update);
 
 module.exports = router;
