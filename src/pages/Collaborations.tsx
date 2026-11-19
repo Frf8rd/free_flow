@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/auth";
 import { formatBudget, formatDate, statusLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Engagement } from "@/types";
+import { useI18n } from "@/i18n";
 
 function ReviewForm({ e, onDone }: { e: Engagement; onDone: () => void }) {
   const [rating, setRating] = useState(5);
@@ -74,6 +75,7 @@ function EngagementCard({
   isClient: boolean;
   onChange: () => void;
 }) {
+  const { locale } = useI18n();
   const [ai, setAi] = useState(e.aiUsed);
   const move = useMutation({
     mutationFn: (s: "DELIVERED" | "COMPLETED") =>
@@ -92,7 +94,7 @@ function EngagementCard({
           <h2 className="font-display text-lg">{e.projectTitle}</h2>
           <p className="mt-1 text-small text-muted-foreground">
             {isClient ? `Freelancer: ${e.freelancer.name}` : `Client: ${e.client.name}`} ·{" "}
-            {formatBudget(e.budget)} · început {formatDate(e.startedAt)}
+            {formatBudget(e.budget, locale)} · început {formatDate(e.startedAt, locale)}
           </p>
         </div>
         <Badge variant="outline">{statusLabel[e.status]}</Badge>

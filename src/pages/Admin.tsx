@@ -15,8 +15,10 @@ import { ErrorState, PageHeader } from "@/components/common/states";
 import { adminProjectsQuery, adminReportsQuery, adminUsersQuery } from "@/hooks/use-queries";
 import { adminService } from "@/services";
 import { formatDate, roleLabel, statusLabel } from "@/lib/format";
+import { useI18n } from "@/i18n";
 
 export function AdminPage() {
+  const { locale } = useI18n();
   const qc = useQueryClient();
   const users = useQuery(adminUsersQuery());
   const projects = useQuery(adminProjectsQuery());
@@ -77,7 +79,7 @@ export function AdminPage() {
                     <TableCell>
                       <Badge variant="outline">{u.status === "ACTIVE" ? "Activ" : "Blocat"}</Badge>
                     </TableCell>
-                    <TableCell>{formatDate(u.createdAt)}</TableCell>
+                    <TableCell>{formatDate(u.createdAt, locale)}</TableCell>
                     <TableCell className="text-right">
                       {u.role !== "ADMIN" && (
                         <Button size="sm" variant="ghost" onClick={() => block.mutate(u.id)}>
@@ -137,7 +139,7 @@ export function AdminPage() {
                   <TableRow key={r.id}>
                     <TableCell>{r.reason}</TableCell>
                     <TableCell className="max-w-xs truncate">{r.targetName}</TableCell>
-                    <TableCell>{formatDate(r.createdAt)}</TableCell>
+                    <TableCell>{formatDate(r.createdAt, locale)}</TableCell>
                     <TableCell className="text-right">
                       {r.status === "OPEN" ? (
                         <Button size="sm" variant="soft" onClick={() => resolve.mutate(r.id)}>

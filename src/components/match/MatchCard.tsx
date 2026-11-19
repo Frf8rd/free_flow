@@ -10,6 +10,7 @@ import { ScoreRing } from "./ScoreRing";
 import { TalentBadge } from "@/components/freelancer/TalentBadge";
 import { TierBadge } from "@/components/freelancer/TierBadge";
 import { matchesService, type MatchAction } from "@/services";
+import { useI18n } from "@/i18n";
 
 /** Reports the card once, when ≥ 50% of it has been visible (fairness: exposure is measured). */
 function useImpression(id: string, enabled: boolean) {
@@ -177,6 +178,7 @@ export function ProjectMatchCard({
   match: ProjectMatch;
   onChange?: () => void;
 }) {
+  const { locale } = useI18n();
   const p = match.project;
   const ref = useImpression(match.id, true);
   return (
@@ -189,7 +191,7 @@ export function ProjectMatchCard({
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg">{p.title}</h3>
           <p className="mt-1 text-small text-muted-foreground">
-            {p.categoryName} · {formatBudget(p.budget)} · până la {formatDate(p.deadline)}
+            {p.categoryName} · {formatBudget(p.budget, locale)} · până la {formatDate(p.deadline, locale)}
           </p>
         </div>
         <ScoreRing score={match.score} />

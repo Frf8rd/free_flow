@@ -1,28 +1,30 @@
 import { Link } from "@tanstack/react-router";
 
 import { Brand } from "./Brand";
+import { useI18n } from "@/i18n";
 
 export function PublicFooter() {
+  const { t } = useI18n();
   return (
     <footer className="border-t border-border">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
         <div className="max-w-xs">
           <Brand />
           <p className="mt-3 text-small text-muted-foreground">
-            Platforma de freelancing unde câștigă cel mai potrivit, nu cel mai cunoscut.
+            {t("footer.description")}
           </p>
         </div>
-        <FooterCol title="Produs">
-          <FooterLink to="/" hash="cum-functioneaza">Cum funcționează</FooterLink>
-          <FooterLink to="/" hash="echitate">Echitate prin design</FooterLink>
-          <FooterLink to="/" hash="trepte">Treptele de încredere</FooterLink>
-          <FooterLink to="/browse">Explorează freelanceri</FooterLink>
+        <FooterCol title={t("footer.product")}>
+          <FooterLink to="/" hash="cum-functioneaza">{t("nav.how")}</FooterLink>
+          <FooterLink to="/" hash="echitate">{t("nav.fairness")}</FooterLink>
+          <FooterLink to="/" hash="trepte">{t("nav.tiers")}</FooterLink>
+          <FooterLink to="/browse">{t("nav.browse")}</FooterLink>
         </FooterCol>
         <FooterCol title="Începe">
-          <FooterLink to="/" hash="pentru-clienti">Pentru clienți</FooterLink>
-          <FooterLink to="/" hash="pentru-freelanceri">Pentru freelanceri</FooterLink>
-          <FooterLink to="/register">Creează cont</FooterLink>
-          <FooterLink to="/login">Autentificare</FooterLink>
+          <FooterLink to="/" hash="pentru-clienti">{t("nav.clients")}</FooterLink>
+          <FooterLink to="/" hash="pentru-freelanceri">{t("nav.freelancers")}</FooterLink>
+          <FooterLink to="/register">{t("nav.register")}</FooterLink>
+          <FooterLink to="/login">{t("nav.login")}</FooterLink>
         </FooterCol>
         <FooterCol title="Ajutor">
           <FooterLink to="/" hash="intrebari">Întrebări frecvente</FooterLink>

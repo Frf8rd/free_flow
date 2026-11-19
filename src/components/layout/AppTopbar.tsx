@@ -4,11 +4,26 @@ import { ChevronRight, Menu } from "lucide-react";
 import { pageTitles } from "@/lib/navigation";
 import { useSidebarStore } from "@/store/sidebar";
 import { NotificationsButton } from "./NotificationsButton";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useI18n } from "@/i18n";
 
 export function AppTopbar() {
+  const { t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
-  const title = pageTitles[pathname] ?? "Pagină";
+  const titles: Record<string, string> = {
+    "/dashboard": t("app.dashboard"),
+    "/matches": t("app.matches"),
+    "/projects/active": `${t("app.projects")} ${t("app.active")}`,
+    "/projects/archive": `${t("app.archive")} ${t("app.projects").toLowerCase()}`,
+    "/projects/new": t("app.quickPost"),
+    "/messages": t("app.messages"),
+    "/collaborations": t("app.collaborations"),
+    "/portfolio": t("app.portfolio"),
+    "/settings": t("app.settings"),
+    "/admin": t("app.admin"),
+  };
+  const title = titles[pathname] ?? pageTitles[pathname] ?? t("app.page");
 
   return (
     <header className="flex h-[76px] items-center gap-3 px-5 pt-4 md:px-8 lg:pl-0">
@@ -35,7 +50,8 @@ export function AppTopbar() {
           </li>
         </ol>
       </nav>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <LanguageSwitcher compact />
         <NotificationsButton />
       </div>
     </header>

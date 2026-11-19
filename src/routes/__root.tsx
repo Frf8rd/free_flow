@@ -16,9 +16,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { DevRoleSwitcher } from "@/components/layout/DevRoleSwitcher";
 import { rehydrateStores } from "@/store";
 import { useApplyTheme } from "@/hooks/use-apply-theme";
+import { I18nProvider } from "@/i18n";
 
 // Runs before paint so a saved light/system preference never flashes dark. Key must match THEME_STORAGE_KEY.
-const themeScript = `(function(){try{var t=(JSON.parse(localStorage.getItem("fairmatch-theme")||"{}").state||{}).theme||"dark";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);}catch(e){}})();`;
+const themeScript = `(function(){try{var t=(JSON.parse(localStorage.getItem("fairmatch-theme")||"{}").state||{}).theme||"dark";var d=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);var l=localStorage.getItem("fairmatch-language");if(l==="ro"||l==="ru"||l==="en")document.documentElement.lang=l;}catch(e){}})();`;
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
@@ -107,10 +108,12 @@ function RootComponent() {
   useApplyTheme();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster />
-      <DevRoleSwitcher />
-    </QueryClientProvider>
+    <I18nProvider>
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+        <Toaster />
+        <DevRoleSwitcher />
+      </QueryClientProvider>
+    </I18nProvider>
   );
 }

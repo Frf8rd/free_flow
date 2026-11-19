@@ -8,8 +8,10 @@ import { TierBadge } from "@/components/freelancer/TierBadge";
 import { freelancerQuery, reviewsQuery } from "@/hooks/use-queries";
 import { availabilityLabel, formatDate, formatRate, initials } from "@/lib/format";
 import { useAuthStore } from "@/store/auth";
+import { useI18n } from "@/i18n";
 
 export function FreelancerProfilePage({ id }: { id: string }) {
+  const { locale } = useI18n();
   const { data: f, isLoading } = useQuery(freelancerQuery(id));
   const reviews = useQuery(reviewsQuery(id));
   const role = useAuthStore((s) => s.user?.role);
@@ -121,7 +123,7 @@ export function FreelancerProfilePage({ id }: { id: string }) {
                     <p className="flex items-center gap-1 text-small font-semibold">
                       <Star className="size-4 fill-primary text-primary" aria-hidden /> {r.rating}/5{" "}
                       <span className="font-normal text-muted-foreground">
-                        · {r.projectTitle} · {formatDate(r.createdAt)}
+                        · {r.projectTitle} · {formatDate(r.createdAt, locale)}
                       </span>
                     </p>
                     <p className="mt-2 text-small">{r.comment}</p>

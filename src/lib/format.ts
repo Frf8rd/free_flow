@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n";
+
 export function initials(name: string) {
   return name
     .split(/\s+/)
@@ -11,10 +13,10 @@ export const roleLabel = { CLIENT: "Client", FREELANCER: "Freelancer", ADMIN: "A
 
 export const formatRate = (eur: number) => `${eur} €/h`;
 
-const rtf = new Intl.RelativeTimeFormat("ro", { numeric: "auto" });
 /** "acum 25 de minute", "ieri"… */
-export function timeAgo(iso: string) {
+export function timeAgo(iso: string, locale: Locale = "ro") {
   const diff = (new Date(iso).getTime() - Date.now()) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
   const steps: [Intl.RelativeTimeFormatUnit, number][] = [
     ["day", 86400],
     ["hour", 3600],
@@ -24,11 +26,12 @@ export function timeAgo(iso: string) {
     if (Math.abs(diff) >= s) return rtf.format(Math.round(diff / s), unit);
   return "acum";
 }
-export const formatDate = (iso: string) =>
-  new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short", year: "numeric" }).format(
+export const formatDate = (iso: string, locale: Locale = "ro") =>
+  new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : locale === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(
     new Date(iso),
   );
-export const formatBudget = (eur: number) => `${eur.toLocaleString("ro-RO")} €`;
+export const formatBudget = (eur: number, locale: Locale = "ro") =>
+  `${eur.toLocaleString(locale === "ro" ? "ro-RO" : locale === "ru" ? "ru-RU" : "en-GB")} €`;
 export const availabilityLabel = {
   FULL_TIME: "Full-time",
   PART_TIME: "Part-time",

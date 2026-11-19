@@ -9,8 +9,10 @@ import { conversationsQuery, messagesQuery } from "@/hooks/use-queries";
 import { messagesService } from "@/services";
 import { initials, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n";
 
 function Chat({ id, onBack }: { id: string; onBack: () => void }) {
+  const { locale } = useI18n();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery(messagesQuery(id));
   const [text, setText] = useState("");
@@ -59,7 +61,7 @@ function Chat({ id, onBack }: { id: string; onBack: () => void }) {
                       mine ? "text-primary-foreground/70" : "text-muted-foreground",
                     )}
                   >
-                    {timeAgo(m.createdAt)}
+                    {timeAgo(m.createdAt, locale)}
                   </p>
                 </div>
               </div>
@@ -90,6 +92,7 @@ function Chat({ id, onBack }: { id: string; onBack: () => void }) {
 }
 
 export function MessagesPage() {
+  const { locale } = useI18n();
   const { data, isLoading, isError, refetch } = useQuery(conversationsQuery());
   const [active, setActive] = useState<string | null>(null);
   const current = active ?? undefined;
@@ -131,7 +134,7 @@ export function MessagesPage() {
                         <span className="flex justify-between gap-2">
                           <span className="truncate font-semibold">{c.participant.name}</span>
                           <span className="shrink-0 text-[11px] text-muted-foreground">
-                            {timeAgo(c.lastMessageAt)}
+                            {timeAgo(c.lastMessageAt, locale)}
                           </span>
                         </span>
                         <span className="block truncate text-small text-muted-foreground">

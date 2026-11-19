@@ -20,6 +20,7 @@ import { MatchCard } from "@/components/match/MatchCard";
 import { Reveal } from "@/components/layout/Reveal";
 import { tiers } from "@/mocks/tiers";
 import type { Match } from "@/types";
+import { useI18n } from "@/i18n";
 
 const heroMatch: Match = {
   id: "exemplu",
@@ -110,28 +111,28 @@ export function LandingPage() {
 }
 
 function Hero() {
+  const { t } = useI18n();
   return (
     <section className="relative overflow-hidden" aria-labelledby="hero-title">
       <div aria-hidden className="bg-hero-glow pointer-events-none absolute inset-0" />
       <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 pt-16 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:pb-28 lg:pt-24">
         <div className="min-w-0 animate-fade-up">
-          <p className="section-label">Freelancing cu potrivire automată</p>
+          <p className="section-label">{t("hero.label")}</p>
           <h1 id="hero-title" className="mt-5 text-[2.6rem] leading-[1.04] sm:text-5xl md:text-6xl lg:text-7xl">
-            Nu cel mai cunoscut. Cel mai <em className="text-primary">potrivit</em>.
+            {t("hero.titleStart")} <em className="text-primary">{t("hero.titleEnd")}</em>.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-            Descrii proiectul în cuvintele tale, iar FairMatch îți arată freelancerii care se potrivesc cu adevărat, cu
-            explicația fiecărei alegeri.
+            {t("hero.text")}
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button size="lg" asChild>
               <Link to="/register" search={{ role: "client" }}>
-                Sunt client <ArrowRight aria-hidden />
+                {t("hero.client")} <ArrowRight aria-hidden />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link to="/register" search={{ role: "freelancer" }}>
-                Sunt freelancer
+                {t("hero.freelancer")}
               </Link>
             </Button>
           </div>
@@ -140,12 +141,12 @@ function Hero() {
         <div className="relative mx-auto w-full min-w-0 max-w-md lg:mx-0 lg:justify-self-end">
           <div className="animate-float">
             <div className="surface-card mb-4 ml-8 max-w-xs p-4 text-small text-muted-foreground shadow-float">
-              <p className="section-label mb-1.5">Proiect</p>
-              „Vreau un site pentru frizeria mea, buget mic, în două săptămâni.”
+              <p className="section-label mb-1.5">{t("hero.project")}</p>
+              {t("hero.projectText")}
             </div>
             <MatchCard match={heroMatch} className="shadow-float" />
           </div>
-          <p className="mt-4 text-center text-[12px] text-muted-foreground">Exemplu ilustrativ de potrivire</p>
+          <p className="mt-4 text-center text-[12px] text-muted-foreground">{t("hero.example")}</p>
         </div>
       </div>
     </section>

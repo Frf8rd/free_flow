@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { BrandDot } from "./Brand";
 import { ThemeCycleButton, ThemeSwitch } from "./ThemeSwitch";
+import { useI18n } from "@/i18n";
 
 interface SidebarContentProps {
   collapsed?: boolean;
@@ -46,7 +47,19 @@ const itemBase =
   "group relative flex min-h-11 items-center gap-3 rounded-[var(--radius-item)] px-3.5 py-3 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-selected/60 hover:text-foreground data-[status=active]:bg-selected data-[status=active]:text-foreground";
 const iconBase = "size-[18px] shrink-0 transition-colors group-data-[status=active]:text-primary";
 
+function quickActionLabel(label: string, t: (key: string) => string) {
+  const labels: Record<string, string> = {
+    "Completează profilul": t("app.quickProfile"),
+    "Adaugă în portofoliu": t("app.quickPortfolio"),
+    "Scrie un mesaj": t("app.quickMessage"),
+    "Postează proiect": t("app.quickPost"),
+    "Invită un freelancer": t("app.quickInvite"),
+  };
+  return labels[label] ?? label;
+}
+
 export function SidebarContent({ collapsed = false, mobile = false }: SidebarContentProps) {
+  const { t } = useI18n();
   const user = useAuthStore((s) => s.user);
   const toggleCollapsed = useSidebarStore((s) => s.toggleCollapsed);
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
@@ -73,17 +86,17 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            aria-label="Închide meniul"
+            aria-label={t("app.closeMenu")}
             className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-border text-muted-foreground transition-colors hover:bg-selected hover:text-foreground"
           >
             <X className="size-4" />
           </button>
         ) : (
-          <RailTip show={collapsed} label="Extinde bara laterală">
+          <RailTip show={collapsed} label={collapsed ? t("app.expandSidebar") : t("app.collapseSidebar")}>
             <button
               type="button"
               onClick={toggleCollapsed}
-              aria-label={collapsed ? "Extinde bara laterală" : "Restrânge bara laterală"}
+              aria-label={collapsed ? t("app.expandSidebar") : t("app.collapseSidebar")}
               aria-expanded={!collapsed}
               className={cn(
                 "flex size-8 cursor-pointer items-center justify-center rounded-[10px] border border-border text-muted-foreground transition-colors hover:bg-selected hover:text-foreground",
@@ -98,14 +111,14 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
 
       <div className={cn("flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 pt-5 [&>*]:shrink-0", collapsed && "items-center px-3")}>
         {/* Search */}
-        <RailTip show={collapsed} label="Caută (Ctrl K)">
+        <RailTip show={collapsed} label={`${t("app.search")} (Ctrl K)`}>
           <button
             type="button"
             onClick={() => {
               close();
               setCommandOpen(true);
             }}
-            aria-label="Caută"
+            aria-label={t("app.search")}
             aria-keyshortcuts="Control+K Meta+K"
             className={cn(
               "flex h-11 cursor-pointer items-center gap-2.5 rounded-[var(--radius-input)] border border-border bg-inset text-sm text-muted-foreground transition-colors hover:text-foreground",
@@ -115,7 +128,7 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
             <Search className="size-4 shrink-0" aria-hidden />
             {!collapsed && (
               <>
-                <span>Caută</span>
+                <span>{t("app.search")}</span>
                 <kbd className="ml-auto rounded-md border border-border bg-panel px-1.5 py-0.5 font-sans text-[11px] font-medium">
                   Ctrl K
                 </kbd>
@@ -129,7 +142,7 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
 
         {/* Navigation */}
         <nav aria-label="Navigare aplicație" className={cn("flex flex-col gap-1", collapsed ? "items-center" : "w-full")}>
-          {!collapsed && <p className="section-label px-3.5 pb-1.5">Privire generală</p>}
+          {!collapsed && <p className="section-label px-3.5 pb-1.5">{t("app.overview")}</p>}
           {visibleNav(user.role).map((item) => (
             <NavRow key={item.key} item={item} role={user.role} collapsed={collapsed} counts={counts} onNavigate={close} />
           ))}
@@ -146,6 +159,7 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
 }
 
 function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: boolean; onNavigate: () => void }) {
+  const { t } = useI18n();
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
@@ -186,7 +200,7 @@ function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: bo
             navigate({ to: "/settings" });
           }}
         >
-          <Settings /> Setări
+          <Settings /> {t("app.settings")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -194,7 +208,7 @@ function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: bo
             navigate({ to: "/" });
           }}
         >
-          <LogOut /> Deconectare
+          <LogOut /> {t("app.logout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -202,6 +216,7 @@ function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: bo
 }
 
 function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: boolean; onNavigate: () => void }) {
+  const { t } = useI18n();
   const open = useSidebarStore((s) => s.quickActionsOpen);
   const toggle = useSidebarStore((s) => s.toggleQuickActions);
   const setOpen = useSidebarStore((s) => s.setQuickActionsOpen);
@@ -211,19 +226,19 @@ function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: 
   if (collapsed) {
     return (
       <DropdownMenu>
-        <RailTip show label="Acțiuni rapide">
+        <RailTip show label={t("app.quickActions")}>
           <DropdownMenuTrigger
-            aria-label="Acțiuni rapide"
+            aria-label={t("app.quickActions")}
             className="group flex size-11 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus className="size-5 transition-transform duration-200 group-data-[state=open]:rotate-45" aria-hidden />
           </DropdownMenuTrigger>
         </RailTip>
         <DropdownMenuContent side="right" align="start" className="w-60">
-          <DropdownMenuLabel className="section-label">Acțiuni rapide</DropdownMenuLabel>
+          <DropdownMenuLabel className="section-label">{t("app.quickActions")}</DropdownMenuLabel>
           {actions.map((a) => (
             <DropdownMenuItem key={a.label} onSelect={() => navigate({ to: a.to })}>
-              <a.icon /> {a.label}
+              <a.icon /> {quickActionLabel(a.label, t)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -248,7 +263,7 @@ function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: 
         <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Plus className={cn("size-5 transition-transform duration-200", open && "rotate-45")} aria-hidden />
         </span>
-        Acțiuni rapide
+        {t("app.quickActions")}
         <span className="sr-only">{open ? "(deschis)" : "(închis)"}</span>
       </button>
       <div
@@ -271,7 +286,7 @@ function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: 
                 className="flex min-h-11 items-center gap-3 rounded-[12px] px-3 text-sm text-muted-foreground transition-colors hover:bg-selected hover:text-foreground"
               >
                 <a.icon className="size-4" aria-hidden />
-                {a.label}
+                {quickActionLabel(a.label, t)}
               </Link>
             </li>
           ))}
@@ -294,7 +309,18 @@ function NavRow({
   counts?: SidebarCounts | undefined;
   onNavigate: () => void;
 }) {
-  const label = navLabel(item, role);
+  const { t } = useI18n();
+  const navLabels: Record<string, string> = {
+    dashboard: t("app.dashboard"),
+    matches: role === "FREELANCER" ? t("app.matchesForMe") : t("app.matches"),
+    projects: t("app.projects"),
+    messages: t("app.messages"),
+    collaborations: t("app.collaborations"),
+    portfolio: t("app.portfolio"),
+    settings: t("app.settings"),
+    admin: t("app.admin"),
+  };
+  const label = navLabels[item.key] ?? navLabel(item, role);
   const Icon = item.icon;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const projectsOpen = useSidebarStore((s) => s.projectsOpen);
@@ -304,7 +330,7 @@ function NavRow({
   const badge =
     !badgeCount ? null : item.badge === "matches" ? (
       <Badge variant="coral" className="ml-auto" aria-label={`${badgeCount} potriviri nevăzute`}>
-        NOU
+        {t("app.new")}
       </Badge>
     ) : (
       <Badge variant="soft" className="ml-auto min-w-6 justify-center" aria-label={`${badgeCount} mesaje necitite`}>
@@ -367,7 +393,7 @@ function NavRow({
             {item.children.map((c) => (
               <li key={c.to} className="pt-1">
                 <Link to={c.to} onClick={onNavigate} className={cn(itemBase, "min-h-10 py-2")}>
-                  {c.label}
+                  {c.to === "/projects/active" ? t("app.active") : c.to === "/projects/archive" ? t("app.archive") : c.label}
                 </Link>
               </li>
             ))}

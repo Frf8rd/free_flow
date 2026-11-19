@@ -9,8 +9,10 @@ import { EmptyState, ErrorState, PageHeader } from "@/components/common/states";
 import { myProjectsQuery } from "@/hooks/use-queries";
 import { projectsService } from "@/services";
 import { formatBudget, formatDate, statusLabel } from "@/lib/format";
+import { useI18n } from "@/i18n";
 
 export function ProjectsPage({ archive = false }: { archive?: boolean }) {
+  const { locale } = useI18n();
   const qc = useQueryClient();
   const { data, isLoading, isError, refetch } = useQuery(myProjectsQuery());
   const refresh = () => qc.invalidateQueries({ queryKey: ["projects"] });
@@ -88,7 +90,7 @@ export function ProjectsPage({ archive = false }: { archive?: boolean }) {
                   <Badge variant="outline">{statusLabel[p.status]}</Badge>
                 </div>
                 <p className="mt-1 text-small text-muted-foreground">
-                  {p.categoryName} · {formatBudget(p.budget)} · termen {formatDate(p.deadline)}
+                  {p.categoryName} · {formatBudget(p.budget, locale)} · termen {formatDate(p.deadline, locale)}
                 </p>
               </div>
               <div className="flex gap-2">

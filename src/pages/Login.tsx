@@ -13,8 +13,10 @@ import { loginSchema, type LoginValues } from "@/lib/validation";
 import { authService, getErrorMessage } from "@/services";
 import { useAuthStore } from "@/store/auth";
 import { MOCK_WRONG_PASSWORD } from "@/mocks/users";
+import { useI18n } from "@/i18n";
 
 export function LoginPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
   const [showPw, setShowPw] = useState(false);
@@ -32,13 +34,13 @@ export function LoginPage() {
 
   return (
     <AuthCard
-      title="Bine ai revenit"
-      subtitle="Intră în cont ca să-ți vezi potrivirile."
+      title={t("auth.back")}
+      subtitle={t("auth.loginSubtitle")}
       footer={
         <>
-          Nu ai cont?{" "}
+          {t("auth.noAccount")}{" "}
           <Link to="/register" className="font-semibold text-primary underline-offset-4 hover:underline">
-            Creează unul
+            {t("auth.createOne")}
           </Link>
         </>
       }
@@ -51,11 +53,11 @@ export function LoginPage() {
           </div>
         )}
 
-        <Field id="email" label="Email" error={errors.email?.message}>
+        <Field id="email" label={t("auth.email")} error={errors.email?.message}>
           <Input type="email" autoComplete="email" placeholder="nume@exemplu.ro" {...fieldA11y("email", errors.email?.message)} {...form.register("email")} />
         </Field>
 
-        <Field id="password" label="Parolă" error={errors.password?.message}>
+        <Field id="password" label={t("auth.password")} error={errors.password?.message}>
           <div className="relative">
             <Input
               type={showPw ? "text" : "password"}
@@ -67,7 +69,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              aria-label={showPw ? "Ascunde parola" : "Arată parola"}
+              aria-label={showPw ? t("auth.hidePassword") : t("auth.showPassword")}
               className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
             >
               {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -77,7 +79,7 @@ export function LoginPage() {
 
         <Button type="submit" size="lg" disabled={mutation.isPending} className="mt-2 w-full">
           {mutation.isPending && <Loader2 className="animate-spin" aria-hidden />}
-          {mutation.isPending ? "Se verifică…" : "Autentificare"}
+          {mutation.isPending ? t("auth.checking") : t("auth.login")}
         </Button>
 
         {import.meta.env.DEV && (

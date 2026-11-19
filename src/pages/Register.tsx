@@ -13,6 +13,7 @@ import { AuthCard } from "@/components/layout/AuthCard";
 import { passwordStrength, registerSchema, type RegisterValues } from "@/lib/validation";
 import { authService, getErrorMessage } from "@/services";
 import { useAuthStore } from "@/store/auth";
+import { useI18n } from "@/i18n";
 
 const roleCards = [
   { value: "CLIENT" as const, title: "Client", text: "Am un proiect și caut freelancerul potrivit.", icon: Briefcase },
@@ -20,6 +21,7 @@ const roleCards = [
 ];
 
 export function RegisterPage({ initialRole }: { initialRole?: "client" | "freelancer" | undefined }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
   const [showPw, setShowPw] = useState(false);
@@ -47,13 +49,13 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
 
   return (
     <AuthCard
-      title="Creează cont"
-      subtitle="Durează un minut. Potrivirile vin imediat după."
+      title={t("auth.registerTitle")}
+      subtitle={t("auth.registerSubtitle")}
       footer={
         <>
-          Ai deja cont?{" "}
+          {t("auth.haveAccount")}{" "}
           <Link to="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
-            Autentifică-te
+            {t("auth.signIn")}
           </Link>
         </>
       }
@@ -67,12 +69,12 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
         )}
 
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold">Ce tip de cont vrei?</legend>
+          <legend className="mb-2 text-sm font-semibold">{t("auth.accountType")}</legend>
           <Controller
             control={form.control}
             name="role"
             render={({ field }) => (
-              <div role="radiogroup" aria-label="Tip de cont" className="grid grid-cols-2 gap-3">
+              <div role="radiogroup" aria-label={t("auth.accountTypeAria")} className="grid grid-cols-2 gap-3">
                 {roleCards.map((c) => {
                   const active = field.value === c.value;
                   return (
@@ -96,8 +98,8 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
                         <c.icon className="size-5" aria-hidden />
                       </span>
                       <span>
-                        <span className="block font-semibold">{c.title}</span>
-                        <span className="mt-0.5 block text-small text-muted-foreground">{c.text}</span>
+                        <span className="block font-semibold">{c.value === "CLIENT" ? t("auth.client") : t("auth.freelancer")}</span>
+                        <span className="mt-0.5 block text-small text-muted-foreground">{c.value === "CLIENT" ? t("auth.clientText") : t("auth.freelancerText")}</span>
                       </span>
                       {active && (
                         <span className="absolute right-3 top-3 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -117,17 +119,17 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
           )}
         </fieldset>
 
-        <Field id="name" label="Nume complet" error={errors.name?.message}>
+        <Field id="name" label={t("auth.name")} error={errors.name?.message}>
           <Input autoComplete="name" placeholder="Nume Prenume" {...fieldA11y("name", errors.name?.message)} {...form.register("name")} />
         </Field>
 
-        <Field id="email" label="Email" error={errors.email?.message}>
+        <Field id="email" label={t("auth.email")} error={errors.email?.message}>
           <Input type="email" autoComplete="email" placeholder="nume@exemplu.ro" {...fieldA11y("email", errors.email?.message)} {...form.register("email")} />
         </Field>
 
         <Field
           id="password"
-          label="Parolă"
+          label={t("auth.password")}
           error={errors.password?.message}
           hint={
             <div className="flex flex-col gap-1.5">
@@ -143,7 +145,7 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
                 ))}
               </div>
               <span>
-                {pw ? `Putere: ${strength.label}. ` : ""}Minimum 8 caractere, cu litere și cifre.
+                {pw ? `${t("auth.power")}: ${strength.label}. ` : ""}{t("auth.passwordHint")}
               </span>
             </div>
           }
@@ -159,7 +161,7 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              aria-label={showPw ? "Ascunde parola" : "Arată parola"}
+              aria-label={showPw ? t("auth.hidePassword") : t("auth.showPassword")}
               className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
             >
               {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -169,7 +171,7 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
 
         <Button type="submit" size="lg" disabled={mutation.isPending} className="mt-2 w-full">
           {mutation.isPending && <Loader2 className="animate-spin" aria-hidden />}
-          {mutation.isPending ? "Se creează contul…" : "Creează cont"}
+          {mutation.isPending ? t("auth.creating") : t("auth.register")}
         </Button>
       </form>
     </AuthCard>

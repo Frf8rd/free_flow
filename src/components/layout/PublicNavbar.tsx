@@ -6,19 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Brand } from "./Brand";
 import { ThemeSwitch } from "./ThemeSwitch";
-
-const links = [
-  { label: "Cum funcționează", hash: "cum-functioneaza" },
-  { label: "Pentru clienți", hash: "pentru-clienti" },
-  { label: "Pentru freelanceri", hash: "pentru-freelanceri" },
-] as const;
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useI18n } from "@/i18n";
 
 export function PublicNavbar() {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
+  const links = [
+    { label: t("nav.how"), hash: "cum-functioneaza" },
+    { label: t("nav.clients"), hash: "pentru-clienti" },
+    { label: t("nav.freelancers"), hash: "pentru-freelanceri" },
+  ] as const;
 
   return (
     <header className="glass sticky top-0 z-40 border-b border-border/70">
-      <nav aria-label="Navigare principală" className="mx-auto flex h-18 max-w-7xl items-center gap-6 px-5 py-3 md:px-8">
+      <nav aria-label={t("nav.primary")} className="mx-auto flex h-18 max-w-7xl items-center gap-6 px-5 py-3 md:px-8">
         <Brand />
 
         <ul className="ml-6 hidden items-center gap-1 lg:flex">
@@ -36,24 +38,25 @@ export function PublicNavbar() {
         </ul>
 
         <div className="ml-auto hidden items-center gap-3 lg:flex">
+          <LanguageSwitcher />
           <ThemeSwitch size="sm" />
           <Button variant="ghost" asChild>
-            <Link to="/login">Autentificare</Link>
+            <Link to="/login">{t("nav.login")}</Link>
           </Button>
           <Button asChild>
-            <Link to="/register">Creează cont</Link>
+            <Link to="/register">{t("nav.register")}</Link>
           </Button>
         </div>
 
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="ml-auto lg:hidden" aria-label="Deschide meniul">
+            <Button variant="outline" size="icon" className="ml-auto lg:hidden" aria-label={t("nav.openMenu")}>
               <Menu />
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="flex w-[86%] max-w-sm flex-col gap-6 border-border bg-panel">
-            <SheetTitle className="sr-only">Meniu</SheetTitle>
-            <SheetDescription className="sr-only">Navigare FairMatch</SheetDescription>
+            <SheetTitle className="sr-only">{t("nav.menu")}</SheetTitle>
+            <SheetDescription className="sr-only">{t("nav.publicDescription")}</SheetDescription>
             <Brand />
             <ul className="flex flex-col gap-1">
               {links.map((l) => (
@@ -70,12 +73,13 @@ export function PublicNavbar() {
               ))}
             </ul>
             <div className="mt-auto flex flex-col gap-3">
+              <LanguageSwitcher />
               <ThemeSwitch />
               <Button variant="outline" asChild>
-                <Link to="/login" onClick={() => setOpen(false)}>Autentificare</Link>
+                <Link to="/login" onClick={() => setOpen(false)}>{t("nav.login")}</Link>
               </Button>
               <Button asChild>
-                <Link to="/register" onClick={() => setOpen(false)}>Creează cont</Link>
+                <Link to="/register" onClick={() => setOpen(false)}>{t("nav.register")}</Link>
               </Button>
             </div>
           </SheetContent>
