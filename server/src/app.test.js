@@ -2,9 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 process.env.JWT_SECRET = "test-only-secret-that-is-at-least-32-bytes-long";
-delete process.env.GOOGLE_CLIENT_ID;
+process.env.NODE_ENV = "test";
 
 const app = require("./app");
+delete process.env.GOOGLE_CLIENT_ID;
 
 async function withServer(t, run) {
   const server = app.listen(0);

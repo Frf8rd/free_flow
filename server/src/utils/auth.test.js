@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { signAccessToken, verifyAccessToken } = require("./jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("./hash");
 const { isAdminAllowlisted } = require("./adminAccess");
+const { linkGoogleAccountToExistingAdmin } = require("../services/auth.service");
 const { requireRole } = require("../middlewares/requireRole");
 const {
   REFRESH_COOKIE_MAX_AGE_SECONDS,
@@ -56,6 +57,84 @@ test("admin access requires a normalized email in the admin allowlist", async ()
   assert.equal(await isAdminAllowlisted("user@example.com", db), false);
   assert.equal(await isAdminAllowlisted(null, db), false);
   assert.equal(queries[0].where.email, "admin@example.com");
+});
+
+test("Google sign-in links an existing allowlisted admin without changing its role", async () => {
+  const linkedAccounts = [];
+  const tx = {
+    admin: {
+      findUnique: async () => ({ email: "admin@example.com" }),
+    },
+    oAuthAccount: {
+      create: async ({ data }) => linkedAccounts.push(data),
+    },
+    refreshToken: {
+      create: async () => {},
+    },
+  };
+  const user = {
+    id: "admin-1",
+    email: "admin@example.com",
+    name: "Admin",
+    role: "ADMIN",
+    passwordHash: "private-hash",
+    isBlocked: false,
+    tokenVersion: 4,
+  };
+
+  const session = await linkGoogleAccountToExistingAdmin(tx, user, "google-subject-1");
+
+  assert.deepEqual(linkedAccounts, [{
+    provider: "GOOGLE",
+    providerUserId: "google-subject-1",
+    userId: "admin-1",
+  }]);
+  assert.equal(session.user.role, "ADMIN");
+  assert.equal(session.user.passwordHash, undefined);
+  assert.equal(session.accessToken && verifyAccessToken(session.accessToken).tokenVersion, 4);
+});
+
+test("Google sign-in does not link an admin account outside the allowlist", async () => {
+  let linked = false;
+  const tx = {
+    admin: {
+      findUnique: async () => null,
+    },
+    oAuthAccount: {
+      create: async () => { linked = true; },
+    },
+  };
+
+  await assert.rejects(
+    linkGoogleAccountToExistingAdmin(tx, {
+      id: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      isBlocked: false,
+    }, "google-subject-1"),
+    { code: "ADMIN_NOT_ALLOWLISTED" },
+  );
+  assert.equal(linked, false);
+});
+
+test("Google sign-in does not automatically link an existing non-admin account", async () => {
+  let linked = false;
+  const tx = {
+    oAuthAccount: {
+      create: async () => { linked = true; },
+    },
+  };
+
+  await assert.rejects(
+    linkGoogleAccountToExistingAdmin(tx, {
+      id: "user-1",
+      email: "user@example.com",
+      role: "FREELANCER",
+      isBlocked: false,
+    }, "google-subject-1"),
+    { code: "ACCOUNT_LINK_REQUIRED" },
+  );
+  assert.equal(linked, false);
 });
 
 test("refresh cookie is HttpOnly, SameSite, path-scoped, and readable by the refresh handler", () => {

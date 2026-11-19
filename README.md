@@ -355,10 +355,14 @@ Prefix comun: **`/api`**.
 | 🔓 `GET` | `/health` | Verificare că serverul rulează |
 | 🔓 `POST` | `/auth/register` | `{ name, email, password, role }` → `{ user, accessToken, refreshToken }` |
 | 🔓 `POST` | `/auth/login` | `{ email, password }` → `{ user, accessToken, refreshToken }` |
+| 🔓 `POST` | `/auth/oauth/:provider/challenge` | Creează challenge-ul anti-replay pentru `google` sau `apple` |
+| 🔓 `POST` | `/auth/oauth/:provider` | `{ credential, nonce, role, name? }` → autentificare/înregistrare OAuth verificată |
 | 🔓 `POST` | `/auth/refresh` | `{ refreshToken }` → `{ accessToken }` |
 | `POST` | `/auth/logout` | Invalidează refresh token-ul |
 | `POST` | `/auth/change-password` | `{ oldPassword, newPassword }` |
 | `GET` | `/auth/me` | Utilizatorul curent + profilul lui |
+
+Pentru autentificarea socială, serverul verifică tokenul Google/Apple și cere un `nonce` emis de endpointul `challenge`. O adresă Google verificată poate fi asociată automat doar cu un cont `ADMIN` deja prezent în allowlist; conturile existente `CLIENT`/`FREELANCER` nu sunt asociate automat. Configurează ID-urile OAuth în variabilele de mediu; fără ele, providerul răspunde cu `PROVIDER_NOT_CONFIGURED`.
 
 #### Utilizatori
 | Metodă | Rută | Descriere |
@@ -870,19 +874,25 @@ model Report {
 ```
 PORT=4000
 NODE_ENV=development
-DATABASE_URL=
-DIRECT_URL=
-JWT_ACCESS_SECRET=
-JWT_REFRESH_SECRET=
-JWT_ACCESS_EXPIRES=20m
-JWT_REFRESH_EXPIRES=14d
-CORS_ORIGIN=http://localhost:5173
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
+JWT_SECRET=
+FRONTEND_URL=http://localhost:5173
+TRUSTED_PROXIES=
+GOOGLE_CLIENT_ID=
+APPLE_CLIENT_ID=
 ```
 
-`client/.env.example`
+`client-test/.env.example`
 ```
 VITE_API_URL=http://localhost:4000/api
+VITE_GOOGLE_CLIENT_ID=
+VITE_APPLE_CLIENT_ID=
+VITE_APPLE_REDIRECT_URI=
 ```
+
+Creează configurațiile Google OAuth Web și Apple Sign in with Apple folosind aceleași ID-uri în frontend și backend (`VITE_GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_ID`, respectiv `VITE_APPLE_CLIENT_ID`/`APPLE_CLIENT_ID`). Google trebuie să permită originea frontendului. Apple cere un domeniu și URL de redirect înregistrate; `localhost` nu este acceptat, deci pentru testare locală este necesar un URL HTTPS public. După completarea `.env`, repornește Vite și serverul.
+
+Rate limiting-ul folosește contoare atomice partajate în PostgreSQL. În spatele unui reverse proxy, setează `TRUSTED_PROXIES` doar cu IP-urile/CIDR-urile proxy-urilor tale, separate prin virgulă; nu seta `*` și nu expune serverul direct dacă proxy-ul este trusted. Lasă variabila goală pentru acces direct/local.
 
 ### 7.4. Rulare locală
 

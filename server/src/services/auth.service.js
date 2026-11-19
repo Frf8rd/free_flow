@@ -190,6 +190,28 @@ async function verifyProviderCredential(provider, credential, nonce) {
   return claims;
 }
 
+async function linkGoogleAccountToExistingAdmin(tx, user, providerUserId) {
+  if (user.isBlocked) {
+    throw new AppError(403, "ACCOUNT_BLOCKED", "Contul este dezactivat.");
+  }
+  if (user.role !== "ADMIN") {
+    throw new AppError(409, "ACCOUNT_LINK_REQUIRED", "Autentifică-te mai întâi cu metoda existentă a contului.");
+  }
+  if (!(await isAdminAllowlisted(user.email, tx))) {
+    throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Contul nu este autorizat ca administrator.");
+  }
+
+  await tx.oAuthAccount.create({
+    data: {
+      provider: "GOOGLE",
+      providerUserId,
+      userId: user.id,
+    },
+  });
+  const { passwordHash, isBlocked, ...safeUser } = user;
+  return createSession(safeUser, tx, user.tokenVersion);
+}
+
 async function loginWithProvider(provider, input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new AppError(400, "VALIDATION_ERROR", "Datele de autentificare sunt invalide.");
@@ -252,11 +274,10 @@ async function loginWithProvider(provider, input) {
 
       const existingUser = await tx.user.findUnique({ where: { email } });
       if (existingUser) {
-        throw new AppError(
-          409,
-          "ACCOUNT_LINK_REQUIRED",
-          "Există deja un cont cu acest email. Autentifică-te cu metoda existentă; asocierea automată a conturilor este dezactivată.",
-        );
+        if (provider === "google") {
+          return linkGoogleAccountToExistingAdmin(tx, existingUser, claims.sub);
+        }
+        throw new AppError(409, "ACCOUNT_LINK_REQUIRED", "Există deja un cont cu acest email.");
       }
 
       const user = await tx.user.create({
@@ -356,6 +377,7 @@ module.exports = {
   login,
   loginWithProvider,
   createOAuthChallenge,
+  linkGoogleAccountToExistingAdmin,
   refresh,
   logout,
   publicUserSelect,

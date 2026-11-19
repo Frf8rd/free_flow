@@ -75,3 +75,11 @@ model OAuthChallenge {
 
   @@index([provider, expiresAt])
 }
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}

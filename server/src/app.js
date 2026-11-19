@@ -4,6 +4,15 @@ const { errorHandler } = require("./middlewares/errorHandler");
 
 const app = express();
 const allowedOrigin = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
+const trustedProxies = (process.env.TRUSTED_PROXIES || "")
+  .split(",")
+  .map((proxy) => proxy.trim())
+  .filter(Boolean);
+
+if (trustedProxies.some((proxy) => ["*", "0.0.0.0/0", "::/0"].includes(proxy))) {
+  throw new Error("TRUSTED_PROXIES must list specific trusted proxy addresses or subnets.");
+}
+if (trustedProxies.length) app.set("trust proxy", trustedProxies);
 
 app.disable("x-powered-by");
 app.use((req, res, next) => {

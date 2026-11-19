@@ -7,8 +7,8 @@ const { verifyPassword, hashPassword } = require("../utils/hash");
 const { getRefreshToken, setRefreshCookie, clearRefreshCookie } = require("../utils/refreshCookie");
 
 const router = Router();
-const loginLimiter = rateLimit({ max: 10 });
-const refreshLimiter = rateLimit({ max: 60 });
+const loginLimiter = rateLimit({ name: "auth-attempt", max: 10 });
+const refreshLimiter = rateLimit({ name: "auth-refresh", max: 60 });
 
 function respondWithSession(res, session, status = 200) {
   setRefreshCookie(res, session.refreshToken);
