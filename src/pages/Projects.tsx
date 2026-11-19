@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { EmptyState, ErrorState, PageHeader } from "@/components/common/states";
 import { myProjectsQuery } from "@/hooks/use-queries";
 import { projectsService } from "@/services";
@@ -84,13 +85,27 @@ export function ProjectsPage({ archive = false }: { archive?: boolean }) {
         ) : (
           items.map((p) => (
             <article key={p.id} className="surface-card flex flex-wrap items-center gap-4 p-5">
+              {!!p.imageUrls?.length && (
+                <div className="flex w-full flex-wrap gap-2">
+                  {p.imageUrls.map((url, index) => (
+                    <ImagePreview
+                      key={`${url}-${index}`}
+                      src={url}
+                      alt={`${p.title} · imagine ${index + 1}`}
+                      className="size-20"
+                      imageClassName="size-20 object-cover"
+                    />
+                  ))}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg">{p.title}</h2>
                   <Badge variant="outline">{statusLabel[p.status]}</Badge>
                 </div>
                 <p className="mt-1 text-small text-muted-foreground">
-                  {p.categoryName} · {formatBudget(p.budget, locale)} · termen {formatDate(p.deadline, locale)}
+                  {p.categoryName} · {formatBudget(p.budget, locale)} · termen{" "}
+                  {formatDate(p.deadline, locale)}
                 </p>
               </div>
               <div className="flex gap-2">

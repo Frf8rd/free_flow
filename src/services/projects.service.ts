@@ -4,6 +4,7 @@ import { categories } from "@/mocks";
 import { useAuthStore } from "@/store/auth";
 import { api } from "./api";
 import { USE_MOCKS } from "./config";
+import { createImageFormData, createImageUrls } from "@/lib/image-uploads";
 
 export const projectsService = {
   /** GET /projects/me */
@@ -20,8 +21,10 @@ export const projectsService = {
 
   /** POST /projects — the matching run starts asynchronously on the server. */
   async create(input: ProjectInput): Promise<Project> {
+    const { images = [], ...fields } = input;
     if (USE_MOCKS) {
       await mockDelay(700);
+      const imageUrls = createImageUrls(images);
       const db = getDb();
       const user = useAuthStore.getState().user;
       const project: Project = {
@@ -39,6 +42,7 @@ export const projectsService = {
         status: "OPEN",
         createdAt: new Date().toISOString(),
         matchesCount: 0,
+        ...(imageUrls.length ? { imageUrls } : {}),
       };
       db.projects.unshift(project);
       db.runs[project.id] = { startedAt: Date.now(), failed: false };
@@ -48,7 +52,14 @@ export const projectsService = {
           : null;
       return clone(project);
     }
-    const { data } = await api.post<Project>("/projects", input);
+    if (images.length) {
+      const formData = createImageFormData(fields, images);
+      const { data } = await api.post<Project>("/projects", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return data;
+    }
+    const { data } = await api.post<Project>("/projects", fields);
     return data;
   },
 

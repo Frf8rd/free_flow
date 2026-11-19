@@ -14,9 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { ImagePreview } from "@/components/common/ImagePreview";
+import { ImageUpload } from "@/components/common/ImageUpload";
 import { EmptyState, ErrorState, PageHeader } from "@/components/common/states";
 import { portfolioQuery } from "@/hooks/use-queries";
-import { portfolioService } from "@/services";
+import { getErrorMessage, portfolioService } from "@/services";
 import type { PortfolioItem } from "@/types";
 
 function ItemDialog({
@@ -33,6 +35,7 @@ function ItemDialog({
   const [title, setTitle] = useState(base?.title ?? "");
   const [description, setDescription] = useState(base?.description ?? "");
   const [tags, setTags] = useState(base?.tags.join(", ") ?? "");
+  const [images, setImages] = useState<File[]>([]);
   const save = useMutation({
     mutationFn: () =>
       portfolioService.save(
@@ -43,6 +46,7 @@ function ItemDialog({
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean),
+          images,
         },
         base?.id,
       ),
@@ -51,6 +55,7 @@ function ItemDialog({
       void qc.invalidateQueries({ queryKey: ["portfolio"] });
       onClose();
     },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -87,6 +92,11 @@ function ItemDialog({
               onChange={(e) => setTags(e.target.value)}
             />
           </div>
+          <ImageUpload
+            files={images}
+            onFilesChange={setImages}
+            existingImageUrls={base?.imageUrls}
+          />
         </div>
         <DialogFooter>
           <Button
@@ -163,6 +173,19 @@ export function PortfolioPage() {
                   </Button>
                 </div>
               </div>
+              {!!p.imageUrls?.length && (
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {p.imageUrls.map((url, index) => (
+                    <ImagePreview
+                      key={`${url}-${index}`}
+                      src={url}
+                      alt={`${p.title} · imagine ${index + 1}`}
+                      className="w-full"
+                      imageClassName="aspect-video w-full object-cover"
+                    />
+                  ))}
+                </div>
+              )}
               <p className="mt-2 text-small text-muted-foreground">{p.description}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {p.tags.map((t) => (

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HelpCircle, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { EmptyState, ErrorState, PageHeader } from "@/components/common/states";
 import { MatchCard, ProjectMatchCard } from "@/components/match/MatchCard";
 import { matchRunQuery, myProjectsQuery, projectMatchesQuery } from "@/hooks/use-queries";
@@ -62,6 +63,7 @@ function ClientMatches({ initialProject }: { initialProject?: string | undefined
   }, [selected, open]);
   const run = useQuery({ ...matchRunQuery(selected ?? ""), enabled: !!selected });
   const [refreshing, setRefreshing] = useState(false);
+  const selectedProject = open.find((p) => p.id === selected);
 
   if (projects.isLoading) return <Skeletons />;
   if (projects.isError) return <ErrorState onRetry={() => void projects.refetch()} />;
@@ -122,6 +124,20 @@ function ClientMatches({ initialProject }: { initialProject?: string | undefined
           <RefreshCw className={cn(refreshing && "animate-spin")} aria-hidden /> Reîmprospătează
         </Button>
       </div>
+
+      {!!selectedProject?.imageUrls?.length && (
+        <div className="mt-4 flex gap-2 overflow-x-auto">
+          {selectedProject.imageUrls.map((url, index) => (
+            <ImagePreview
+              key={`${url}-${index}`}
+              src={url}
+              alt={`${selectedProject.title} · imagine ${index + 1}`}
+              className="size-20 shrink-0"
+              imageClassName="size-20 object-cover"
+            />
+          ))}
+        </div>
+      )}
 
       {run.data?.clarification && !searching && (
         <aside className="mt-5 flex gap-3 rounded-[var(--radius-card)] border border-primary/30 bg-primary-soft p-5 text-primary-soft-foreground">

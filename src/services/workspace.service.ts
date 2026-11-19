@@ -14,6 +14,7 @@ import type {
 import { MOCK_SELF_FREELANCER_ID, clone, getDb, mockDelay, nextId } from "@/mocks";
 import { api } from "./api";
 import { USE_MOCKS } from "./config";
+import { createImageFormData, createImageUrls } from "@/lib/image-uploads";
 
 const mock = async <T>(fn: () => T, ms = 300): Promise<T> => {
   await mockDelay(ms);
@@ -71,19 +72,35 @@ export const messagesService = {
       : api.get<Message[]>(`/conversations/${id}/messages`).then((r) => r.data),
 
   /** POST /conversations/:id/messages */
-  async send(id: string, body: string): Promise<void> {
-    if (!USE_MOCKS) return void (await api.post(`/conversations/${id}/messages`, { body }));
+  async send(id: string, body: string, images: File[] = []): Promise<void> {
+    if (!USE_MOCKS) {
+      if (images.length) {
+        const formData = createImageFormData({ body }, images);
+        await api.post(`/conversations/${id}/messages`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return;
+      }
+      await api.post(`/conversations/${id}/messages`, { body });
+      return;
+    }
     await mockDelay(150);
     const db = getDb();
+    const imageUrls = createImageUrls(images);
     (db.messages[id] ??= []).push({
       id: nextId("msg"),
       conversationId: id,
       authorId: "me",
       body,
       createdAt: new Date().toISOString(),
+      ...(imageUrls.length ? { imageUrls } : {}),
     });
     const c = db.conversations.find((x) => x.id === id);
-    if (c) Object.assign(c, { lastMessage: body, lastMessageAt: new Date().toISOString() });
+    if (c)
+      Object.assign(c, {
+        lastMessage: body || (imageUrls.length ? "📷" : ""),
+        lastMessageAt: new Date().toISOString(),
+      });
   },
 
   /** PATCH /conversations/:id/read */
@@ -116,15 +133,44 @@ export const portfolioService = {
     );
   },
   async save(input: PortfolioInput, id?: string): Promise<void> {
-    if (!USE_MOCKS)
-      return void (id
-        ? await api.patch(`/freelancers/me/portfolio/${id}`, input)
-        : await api.post("/freelancers/me/portfolio", input));
+    const { images = [], ...fields } = input;
+    if (!USE_MOCKS) {
+      if (images.length) {
+        const formData = createImageFormData(fields, images);
+        if (id) await api.patch(`/freelancers/me/portfolio/${id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        else await api.post("/freelancers/me/portfolio", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return;
+      }
+      if (id) await api.patch(`/freelancers/me/portfolio/${id}`, fields);
+      else await api.post("/freelancers/me/portfolio", fields);
+      return;
+    }
     await mockDelay();
     const f = getDb().freelancers.find((x) => x.id === MOCK_SELF_FREELANCER_ID);
     if (!f) return;
-    if (id) f.portfolio = f.portfolio.map((p) => (p.id === id ? { ...p, ...input } : p));
-    else f.portfolio.unshift({ id: nextId("pf"), ...input });
+    const imageUrls = createImageUrls(images);
+    if (id)
+      f.portfolio = f.portfolio.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...fields,
+              ...(imageUrls.length
+                ? { imageUrls: [...(p.imageUrls ?? []), ...imageUrls] }
+                : {}),
+            }
+          : p,
+      );
+    else
+      f.portfolio.unshift({
+        id: nextId("pf"),
+        ...fields,
+        ...(imageUrls.length ? { imageUrls } : {}),
+      });
   },
   async remove(id: string): Promise<void> {
     if (!USE_MOCKS) return void (await api.delete(`/freelancers/me/portfolio/${id}`));

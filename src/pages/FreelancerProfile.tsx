@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, Languages, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { TalentBadge } from "@/components/freelancer/TalentBadge";
 import { TierBadge } from "@/components/freelancer/TierBadge";
 import { freelancerQuery, reviewsQuery } from "@/hooks/use-queries";
@@ -90,6 +91,19 @@ export function FreelancerProfilePage({ id }: { id: string }) {
                 <article key={p.id} className="surface-card p-5">
                   <h3 className="font-display text-lg">{p.title}</h3>
                   <p className="mt-1 text-small text-muted-foreground">{p.description}</p>
+                  {!!p.imageUrls?.length && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {p.imageUrls.map((url, index) => (
+                        <ImagePreview
+                          key={`${url}-${index}`}
+                          src={url}
+                          alt={`${p.title} · imagine ${index + 1}`}
+                          className="w-full"
+                          imageClassName="aspect-video w-full object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {p.tags.map((t) => (
                       <span

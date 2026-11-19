@@ -103,12 +103,14 @@ export interface PortfolioItem {
   title: string;
   description: string;
   tags: string[];
+  imageUrls?: string[];
 }
 
 export interface PortfolioInput {
   title: string;
   description: string;
   tags: string[];
+  images?: File[];
 }
 
 export interface FreelancerProfile extends FreelancerSummary {
@@ -162,6 +164,7 @@ export interface Project {
   status: ProjectStatus;
   createdAt: string;
   matchesCount: number;
+  imageUrls?: string[];
 }
 
 export interface ProjectInput {
@@ -171,6 +174,7 @@ export interface ProjectInput {
   deadline: string;
   skills: string[];
   title?: string | undefined;
+  images?: File[];
 }
 
 /* ---------- Matches ---------- */
@@ -258,6 +262,7 @@ export interface Message {
   authorId: string;
   body: string;
   createdAt: string;
+  imageUrls?: string[];
 }
 
 /* ---------- Notifications ---------- */

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/common/states";
+import { ImageUpload } from "@/components/common/ImageUpload";
 import { categoriesQuery, skillsQuery } from "@/hooks/use-queries";
 import { getErrorMessage, projectsService } from "@/services";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export function ProjectNewPage() {
   const skills = useQuery(skillsQuery());
   const [form, setForm] = useState({ description: "", categoryId: "", budget: "", deadline: "" });
   const [picked, setPicked] = useState<string[]>([]);
+  const [images, setImages] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const create = useMutation({
@@ -54,7 +56,7 @@ export function ProjectNewPage() {
       return;
     }
     setErrors({});
-    create.mutate({ ...r.data, skills: picked });
+    create.mutate({ ...r.data, skills: picked, images });
   };
   const Err = ({ k }: { k: string }) =>
     errors[k] ? (
@@ -84,6 +86,7 @@ export function ProjectNewPage() {
           />
           <Err k="description" />
         </div>
+        <ImageUpload files={images} onFilesChange={setImages} />
         <div className="grid gap-5 md:grid-cols-3">
           <div>
             <Label htmlFor="cat">Categorie</Label>

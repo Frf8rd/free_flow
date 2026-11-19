@@ -6,6 +6,7 @@ import { formatBudget, formatDate, formatRate, initials } from "@/lib/format";
 import type { Match, MatchBreakdown, ProjectMatch } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Bar } from "@/components/common/states";
+import { ImagePreview } from "@/components/common/ImagePreview";
 import { ScoreRing } from "./ScoreRing";
 import { TalentBadge } from "@/components/freelancer/TalentBadge";
 import { TierBadge } from "@/components/freelancer/TierBadge";
@@ -191,12 +192,26 @@ export function ProjectMatchCard({
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg">{p.title}</h3>
           <p className="mt-1 text-small text-muted-foreground">
-            {p.categoryName} · {formatBudget(p.budget, locale)} · până la {formatDate(p.deadline, locale)}
+            {p.categoryName} · {formatBudget(p.budget, locale)} · până la{" "}
+            {formatDate(p.deadline, locale)}
           </p>
         </div>
         <ScoreRing score={match.score} />
       </div>
       <p className="mt-3 line-clamp-2 text-small text-muted-foreground">{p.description}</p>
+      {!!p.imageUrls?.length && (
+        <div className="mt-3 flex gap-2 overflow-x-auto">
+          {p.imageUrls.map((url, index) => (
+            <ImagePreview
+              key={`${url}-${index}`}
+              src={url}
+              alt={`${p.title} · imagine ${index + 1}`}
+              className="size-20 shrink-0"
+              imageClassName="size-20 object-cover"
+            />
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         {p.skills.map((s) => (
           <span
