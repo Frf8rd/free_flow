@@ -15,6 +15,13 @@ function errorHandler(error, req, res, next) {
     });
   }
 
+  if (error && error.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ error: { code: "IMAGE_TOO_LARGE", message: "Imaginea trebuie să aibă maximum 5 MB." } });
+  }
+  if (error && typeof error.code === "string" && error.code.startsWith("LIMIT_")) {
+    return res.status(400).json({ error: { code: "INVALID_UPLOAD", message: "Încarcă un singur fișier în câmpul image." } });
+  }
+
   if (error && error.code === "P2002") {
     return res.status(409).json({
       error: { code: "CONFLICT", message: "Există deja un cont cu aceste date." },

@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const { AppError } = require("../utils/errors");
+const emailService = require("./email.service");
 
 const include = {
   project: { select: { id: true, title: true, status: true, clientId: true } },
@@ -42,8 +43,12 @@ async function updateEngagement(clientId, id, status, db = prisma) {
   if (!id || !["ACCEPTED", "REJECTED"].includes(status)) {
     throw new AppError(400, "VALIDATION_ERROR", "Acțiunea trebuie să fie ACCEPTED sau REJECTED.");
   }
-  return db.$transaction(async (tx) => {
-    const item = await tx.engagement.findUnique({ where: { id }, include: { project: { select: { status: true } } } });
+  const updated = await db.$transaction(async (tx) => {
+    const item = await tx.engagement.findUnique({ where: { id }, include: {
+      project: { select: { status: true, title: true } },
+      client: { select: { name: true } },
+      freelancer: { select: { id: true, name: true, email: true, emailVerifiedAt: true } },
+    } });
     if (!item) throw new AppError(404, "ENGAGEMENT_NOT_FOUND", "Cererea de colaborare nu a fost găsită.");
     if (item.clientId !== clientId) throw new AppError(403, "FORBIDDEN", "Doar clientul proiectului poate răspunde cererii.");
     if (item.status !== "PENDING") throw new AppError(409, "ENGAGEMENT_ALREADY_HANDLED", "Această cerere a fost deja soluționată.");
@@ -51,16 +56,37 @@ async function updateEngagement(clientId, id, status, db = prisma) {
       throw new AppError(409, "PROJECT_NOT_OPEN", "Proiectul trebuie să fie deschis pentru a accepta cererea.");
     }
 
-    const updated = await tx.engagement.update({ where: { id }, data: { status }, include });
+    const engagement = await tx.engagement.update({ where: { id }, data: { status }, include });
     if (status === "ACCEPTED") {
       const conversation = await tx.conversation.create({
         data: { engagementId: id, clientId: item.clientId, freelancerId: item.freelancerId },
         select: { id: true },
       });
-      return { ...updated, conversation };
+      return { engagement: { ...engagement, conversation }, emailRecipient: item.freelancer, projectTitle: item.project.title, clientName: item.client.name };
     }
-    return updated;
+    return { engagement };
   });
+
+  if (status === "ACCEPTED") {
+    const recipient = updated.emailRecipient;
+    const hasValidVerifiedEmail = recipient?.emailVerifiedAt &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.email);
+    if (hasValidVerifiedEmail) {
+      try {
+        await emailService.sendEmail({
+          to: recipient.email,
+          subject: "Cererea ta de colaborare a fost acceptată",
+          text: `Salut ${recipient.name},\n\n${updated.clientName} ți-a acceptat cererea de colaborare pentru proiectul „${updated.projectTitle}”. Conversația este disponibilă în FairMatch, în pagina Colaborări.\n\nEchipa FairMatch`,
+        });
+      } catch (error) {
+        console.error("Engagement acceptance email failed.", {
+          code: error && typeof error.code === "string" ? error.code : "UNKNOWN",
+        });
+      }
+    }
+  }
+
+  return updated.engagement;
 }
 
 module.exports = { createEngagement, listEngagements, updateEngagement };

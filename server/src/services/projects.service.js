@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const { AppError } = require("../utils/errors");
+const attachmentStorage = require("../utils/projectAttachmentStorage");
 
 const PROJECT_STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED"]);
 const projectInclude = {
@@ -273,7 +274,13 @@ async function reopenProject(projectId, clientId, db = prisma) {
 
 async function deleteProject(projectId, clientId, db = prisma) {
   const project = await findOwnedProject(projectId, clientId, db);
+  const attachments = db.projectAttachment
+    ? await db.projectAttachment.findMany({ where: { projectId: project.id }, select: { storageKey: true } })
+    : [];
   await db.project.delete({ where: { id: project.id } });
+  await Promise.all(attachments.map(({ storageKey }) => attachmentStorage.removeImage(storageKey).catch((error) => {
+    console.error("Private project image cleanup failed.", { code: error.code || "UNKNOWN" });
+  })));
 }
 
 async function listProjects(query = {}, { clientId, db = prisma } = {}) {
