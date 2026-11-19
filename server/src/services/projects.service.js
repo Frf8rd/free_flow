@@ -122,6 +122,160 @@ async function createProject(clientId, input, db = prisma) {
   });
 }
 
+function validateProjectInput(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new AppError(400, "VALIDATION_ERROR", "Datele proiectului sunt invalide.");
+  }
+}
+
+async function findOwnedProject(projectId, clientId, db) {
+  if (typeof projectId !== "string" || !projectId.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Identificatorul proiectului nu este valid.");
+  }
+  const project = await db.project.findUnique({
+    where: { id: projectId.trim() },
+    select: {
+      id: true,
+      clientId: true,
+      status: true,
+      categoryId: true,
+      budgetMin: true,
+      budgetMax: true,
+    },
+  });
+  if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  if (project.clientId !== clientId) {
+    throw new AppError(403, "FORBIDDEN", "Poți modifica doar proiectele create de tine.");
+  }
+  return project;
+}
+
+async function updateProject(projectId, clientId, input, db = prisma) {
+  validateProjectInput(input);
+  const allowedFields = new Set([
+    "title",
+    "description",
+    "categoryId",
+    "budgetMin",
+    "budgetMax",
+    "deadline",
+    "skillIds",
+  ]);
+  const fields = Object.keys(input);
+  if (!fields.length || fields.some((field) => !allowedFields.has(field))) {
+    throw new AppError(400, "VALIDATION_ERROR", "Datele pentru actualizare sunt invalide.");
+  }
+
+  const project = await findOwnedProject(projectId, clientId, db);
+  if (project.status === "CLOSED") {
+    throw new AppError(409, "PROJECT_CLOSED", "Un proiect închis nu mai poate fi modificat.");
+  }
+
+  const data = {};
+  if (Object.prototype.hasOwnProperty.call(input, "title")) {
+    if (typeof input.title !== "string" || !input.title.trim() || input.title.trim().length > 120) {
+      throw new AppError(400, "VALIDATION_ERROR", "Titlul este obligatoriu și trebuie să aibă maximum 120 de caractere.");
+    }
+    data.title = input.title.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "description")) {
+    if (typeof input.description !== "string" || !input.description.trim() || input.description.trim().length > 5000) {
+      throw new AppError(400, "VALIDATION_ERROR", "Descrierea este obligatorie și trebuie să aibă maximum 5000 de caractere.");
+    }
+    data.description = input.description.trim();
+  }
+
+  const categoryId = Object.prototype.hasOwnProperty.call(input, "categoryId")
+    ? typeof input.categoryId === "string" ? input.categoryId.trim() : ""
+    : project.categoryId;
+  if (Object.prototype.hasOwnProperty.call(input, "categoryId")) {
+    if (!categoryId) throw new AppError(400, "VALIDATION_ERROR", "Categoria este obligatorie.");
+    const category = await db.category.findUnique({
+      where: { id: categoryId },
+      select: { id: true },
+    });
+    if (!category) throw new AppError(400, "INVALID_CATEGORY", "Categoria selectată nu există.");
+    data.categoryId = categoryId;
+  }
+
+  const budgetMin = Object.prototype.hasOwnProperty.call(input, "budgetMin")
+    ? parseOptionalBudget(input.budgetMin, "Bugetul minim")
+    : project.budgetMin;
+  const budgetMax = Object.prototype.hasOwnProperty.call(input, "budgetMax")
+    ? parseOptionalBudget(input.budgetMax, "Bugetul maxim")
+    : project.budgetMax;
+  if (budgetMin !== null && budgetMax !== null && budgetMin > budgetMax) {
+    throw new AppError(400, "VALIDATION_ERROR", "Bugetul minim nu poate depăși bugetul maxim.");
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "budgetMin")) data.budgetMin = budgetMin;
+  if (Object.prototype.hasOwnProperty.call(input, "budgetMax")) data.budgetMax = budgetMax;
+
+  if (Object.prototype.hasOwnProperty.call(input, "deadline")) {
+    if (input.deadline === null || input.deadline === "") {
+      data.deadline = null;
+    } else if (typeof input.deadline !== "string" || Number.isNaN(Date.parse(input.deadline))) {
+      throw new AppError(400, "VALIDATION_ERROR", "Termenul proiectului nu este o dată validă.");
+    } else {
+      data.deadline = new Date(input.deadline);
+    }
+  }
+
+  const categoryChanged = categoryId !== project.categoryId;
+  if (Object.prototype.hasOwnProperty.call(input, "skillIds")) {
+    const skillIds = parseSkillIds(input.skillIds);
+    if (skillIds.length) {
+      const skills = await db.skill.findMany({
+        where: { id: { in: skillIds }, categoryId },
+        select: { id: true },
+      });
+      if (skills.length !== skillIds.length) {
+        throw new AppError(400, "INVALID_SKILLS", "Selectează abilități existente din categoria proiectului.");
+      }
+    }
+    data.skills = {
+      deleteMany: {},
+      ...(skillIds.length
+        ? { create: skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } })) }
+        : {}),
+    };
+  } else if (categoryChanged) {
+    data.skills = { deleteMany: {} };
+  }
+
+  return db.project.update({
+    where: { id: project.id },
+    data,
+    include: projectInclude,
+  });
+}
+
+async function closeProject(projectId, clientId, db = prisma) {
+  const project = await findOwnedProject(projectId, clientId, db);
+  if (project.status === "CLOSED") return getProject(project.id, db);
+  return db.project.update({
+    where: { id: project.id },
+    data: { status: "CLOSED" },
+    include: projectInclude,
+  });
+}
+
+async function reopenProject(projectId, clientId, db = prisma) {
+  const project = await findOwnedProject(projectId, clientId, db);
+  if (project.status !== "CLOSED") {
+    throw new AppError(409, "PROJECT_NOT_CLOSED", "Doar proiectele închise pot fi redeschise.");
+  }
+  return db.project.update({
+    where: { id: project.id },
+    data: { status: "OPEN" },
+    include: projectInclude,
+  });
+}
+
+async function deleteProject(projectId, clientId, db = prisma) {
+  const project = await findOwnedProject(projectId, clientId, db);
+  await db.project.delete({ where: { id: project.id } });
+}
+
 async function listProjects(query = {}, { clientId, db = prisma } = {}) {
   const { page, limit } = parsePagination(query);
   const where = {};
@@ -190,4 +344,12 @@ async function getProject(id, db = prisma) {
   return project;
 }
 
-module.exports = { createProject, listProjects, getProject };
+module.exports = {
+  createProject,
+  updateProject,
+  closeProject,
+  reopenProject,
+  deleteProject,
+  listProjects,
+  getProject,
+};

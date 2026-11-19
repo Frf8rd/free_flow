@@ -42,6 +42,18 @@ test("health and protected authentication routes return expected access control"
       body: JSON.stringify({ title: "Test" }),
     });
     assert.equal(createProject.status, 401);
+    const updateProject = await fetch(`${baseUrl}/projects/project-1`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Updated" }),
+    });
+    assert.equal(updateProject.status, 401);
+    const closeProject = await fetch(`${baseUrl}/projects/project-1/close`, { method: "PATCH" });
+    assert.equal(closeProject.status, 401);
+    const reopenProject = await fetch(`${baseUrl}/projects/project-1/reopen`, { method: "PATCH" });
+    assert.equal(reopenProject.status, 401);
+    const deleteProject = await fetch(`${baseUrl}/projects/project-1`, { method: "DELETE" });
+    assert.equal(deleteProject.status, 401);
 
     const missingRefreshCookie = await fetch(`${baseUrl}/auth/refresh`, { method: "POST" });
     assert.equal(missingRefreshCookie.status, 401);
