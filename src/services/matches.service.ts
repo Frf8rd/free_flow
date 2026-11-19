@@ -1,6 +1,7 @@
 import type {
   BrowseFilters,
   FreelancerProfile,
+  FreelancerProfileInput,
   FreelancerSummary,
   Match,
   MatchRun,
@@ -9,9 +10,10 @@ import type {
   ProjectMatch,
   Review,
 } from "@/types";
-import { clone, getDb, mockDelay } from "@/mocks";
+import { MOCK_SELF_FREELANCER_ID, clone, getDb, mockDelay } from "@/mocks";
 import { api } from "./api";
 import { USE_MOCKS } from "./config";
+import { createImageFormData, createImageUrls } from "@/lib/image-uploads";
 
 export type MatchAction = "invite" | "interest" | "dismiss";
 const nextStatus = { invite: "INVITED", interest: "INTERESTED", dismiss: "DISMISSED" } as const;
@@ -194,6 +196,46 @@ export const matchesService = {
     }
     const { data } = await api.get<FreelancerProfile>(`/freelancers/${id}`);
     return data;
+  },
+
+  /** GET /freelancers/me */
+  async getMyProfile(): Promise<FreelancerProfile> {
+    if (USE_MOCKS) {
+      await mockDelay();
+      const profile = getDb().freelancers.find(
+        (freelancer) => freelancer.id === MOCK_SELF_FREELANCER_ID,
+      );
+      if (!profile) throw new Error("Profilul freelancerului nu a fost găsit.");
+      return clone(profile);
+    }
+    const { data } = await api.get<FreelancerProfile>("/freelancers/me");
+    return data;
+  },
+
+  /** PATCH /freelancers/me */
+  async updateMyProfile(input: FreelancerProfileInput): Promise<FreelancerProfile> {
+    const { avatar, ...fields } = input;
+    if (!USE_MOCKS) {
+      if (avatar) {
+        const formData = createImageFormData(fields, [avatar], "avatar");
+        const { data } = await api.patch<FreelancerProfile>("/freelancers/me", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+      }
+      const { data } = await api.patch<FreelancerProfile>("/freelancers/me", fields);
+      return data;
+    }
+    await mockDelay(350);
+    const profile = getDb().freelancers.find(
+      (freelancer) => freelancer.id === MOCK_SELF_FREELANCER_ID,
+    );
+    if (!profile) throw new Error("Profilul freelancerului nu a fost găsit.");
+    const { removeAvatar, ...profileFields } = fields;
+    Object.assign(profile, profileFields);
+    if (avatar) profile.avatarUrl = createImageUrls([avatar])[0];
+    else if (removeAvatar) delete profile.avatarUrl;
+    return clone(profile);
   },
 
   /** GET /freelancers/:id/reviews */

@@ -1,9 +1,19 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Plus, Search, Settings, ShieldCheck, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { initials, roleLabel } from "@/lib/format";
+import { roleLabel } from "@/lib/format";
 import { navLabel, quickActions, visibleNav, type NavItem } from "@/lib/navigation";
 import { useAuthStore } from "@/store/auth";
 import { useSidebarStore } from "@/store/sidebar";
@@ -23,6 +33,7 @@ import {
 import { BrandMark } from "./Brand";
 import { ThemeCycleButton, ThemeSwitch } from "./ThemeSwitch";
 import { useI18n } from "@/i18n";
+import { UserAvatar } from "@/components/common/UserAvatar";
 
 interface SidebarContentProps {
   collapsed?: boolean;
@@ -77,10 +88,15 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
           to="/dashboard"
           onClick={close}
           aria-label="FairMatch — Dashboard"
-          className={cn("flex min-h-11 items-center gap-2.5 rounded-full", collapsed && "justify-center")}
+          className={cn(
+            "flex min-h-11 items-center gap-2.5 rounded-full",
+            collapsed && "justify-center",
+          )}
         >
           <BrandMark />
-          {!collapsed && <span className="font-sans text-sm font-bold tracking-[0.12em]">FAIRMATCH</span>}
+          {!collapsed && (
+            <span className="font-sans text-sm font-bold tracking-[0.12em]">FAIRMATCH</span>
+          )}
         </Link>
         {mobile ? (
           <button
@@ -92,7 +108,10 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
             <X className="size-4" />
           </button>
         ) : (
-          <RailTip show={collapsed} label={collapsed ? t("app.expandSidebar") : t("app.collapseSidebar")}>
+          <RailTip
+            show={collapsed}
+            label={collapsed ? t("app.expandSidebar") : t("app.collapseSidebar")}
+          >
             <button
               type="button"
               onClick={toggleCollapsed}
@@ -109,7 +128,12 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
         )}
       </div>
 
-      <div className={cn("flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 pt-5 [&>*]:shrink-0", collapsed && "items-center px-3")}>
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 pt-5 [&>*]:shrink-0",
+          collapsed && "items-center px-3",
+        )}
+      >
         {/* Search */}
         <RailTip show={collapsed} label={`${t("app.search")} (Ctrl K)`}>
           <button
@@ -141,24 +165,49 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
         <QuickActions user={user} collapsed={collapsed} onNavigate={close} />
 
         {/* Navigation */}
-        <nav aria-label="Navigare aplicație" className={cn("flex flex-col gap-1", collapsed ? "items-center" : "w-full")}>
+        <nav
+          aria-label="Navigare aplicație"
+          className={cn("flex flex-col gap-1", collapsed ? "items-center" : "w-full")}
+        >
           {!collapsed && <p className="section-label px-3.5 pb-1.5">{t("app.overview")}</p>}
           {visibleNav(user.role).map((item) => (
-            <NavRow key={item.key} item={item} role={user.role} collapsed={collapsed} counts={counts} onNavigate={close} />
+            <NavRow
+              key={item.key}
+              item={item}
+              role={user.role}
+              collapsed={collapsed}
+              counts={counts}
+              onNavigate={close}
+            />
           ))}
         </nav>
       </div>
 
       {/* Bottom */}
-      <div className={cn("flex flex-col gap-3 border-t border-border p-4", collapsed && "items-center px-3")}>
-        {user.role === "FREELANCER" && user.tierProgress && <TierCard user={user} collapsed={collapsed} />}
+      <div
+        className={cn(
+          "flex flex-col gap-3 border-t border-border p-4",
+          collapsed && "items-center px-3",
+        )}
+      >
+        {user.role === "FREELANCER" && user.tierProgress && (
+          <TierCard user={user} collapsed={collapsed} />
+        )}
         {collapsed ? <ThemeCycleButton /> : <ThemeSwitch />}
       </div>
     </div>
   );
 }
 
-function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: boolean; onNavigate: () => void }) {
+function ProfileRow({
+  user,
+  collapsed,
+  onNavigate,
+}: {
+  user: User;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
   const { t } = useI18n();
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
@@ -173,19 +222,16 @@ function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: bo
             collapsed ? "size-11 justify-center rounded-full" : "w-full p-2",
           )}
         >
-          <span
-            aria-hidden
-            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground"
-          >
-            {initials(user.name)}
-          </span>
+          <UserAvatar name={user.name} imageUrl={user.avatarUrl} className="size-10 text-sm" />
           {!collapsed && (
             <span className="flex min-w-0 flex-col items-start gap-0.5">
               <span className="truncate text-sm font-semibold">{user.name}</span>
               <Badge variant="role">{user.role}</Badge>
             </span>
           )}
-          {!collapsed && <ChevronDown className="ml-auto size-4 text-muted-foreground" aria-hidden />}
+          {!collapsed && (
+            <ChevronDown className="ml-auto size-4 text-muted-foreground" aria-hidden />
+          )}
         </DropdownMenuTrigger>
       </RailTip>
       <DropdownMenuContent side={collapsed ? "right" : "bottom"} align="start" className="w-60">
@@ -215,7 +261,15 @@ function ProfileRow({ user, collapsed, onNavigate }: { user: User; collapsed: bo
   );
 }
 
-function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: boolean; onNavigate: () => void }) {
+function QuickActions({
+  user,
+  collapsed,
+  onNavigate,
+}: {
+  user: User;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
   const { t } = useI18n();
   const open = useSidebarStore((s) => s.quickActionsOpen);
   const toggle = useSidebarStore((s) => s.toggleQuickActions);
@@ -231,7 +285,10 @@ function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: 
             aria-label={t("app.quickActions")}
             className="group flex size-11 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            <Plus className="size-5 transition-transform duration-200 group-data-[state=open]:rotate-45" aria-hidden />
+            <Plus
+              className="size-5 transition-transform duration-200 group-data-[state=open]:rotate-45"
+              aria-hidden
+            />
           </DropdownMenuTrigger>
         </RailTip>
         <DropdownMenuContent side="right" align="start" className="w-60">
@@ -261,7 +318,10 @@ function QuickActions({ user, collapsed, onNavigate }: { user: User; collapsed: 
         className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[14px] p-1 text-sm font-semibold"
       >
         <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <Plus className={cn("size-5 transition-transform duration-200", open && "rotate-45")} aria-hidden />
+          <Plus
+            className={cn("size-5 transition-transform duration-200", open && "rotate-45")}
+            aria-hidden
+          />
         </span>
         {t("app.quickActions")}
         <span className="sr-only">{open ? "(deschis)" : "(închis)"}</span>
@@ -326,17 +386,25 @@ function NavRow({
   const projectsOpen = useSidebarStore((s) => s.projectsOpen);
   const toggleProjects = useSidebarStore((s) => s.toggleProjects);
 
-  const badgeCount = item.badge === "matches" ? counts?.unseenMatches : item.badge === "messages" ? counts?.unreadMessages : 0;
-  const badge =
-    !badgeCount ? null : item.badge === "matches" ? (
-      <Badge variant="coral" className="ml-auto" aria-label={`${badgeCount} potriviri nevăzute`}>
-        {t("app.new")}
-      </Badge>
-    ) : (
-      <Badge variant="soft" className="ml-auto min-w-6 justify-center" aria-label={`${badgeCount} mesaje necitite`}>
-        {badgeCount}
-      </Badge>
-    );
+  const badgeCount =
+    item.badge === "matches"
+      ? counts?.unseenMatches
+      : item.badge === "messages"
+        ? counts?.unreadMessages
+        : 0;
+  const badge = !badgeCount ? null : item.badge === "matches" ? (
+    <Badge variant="coral" className="ml-auto" aria-label={`${badgeCount} potriviri nevăzute`}>
+      {t("app.new")}
+    </Badge>
+  ) : (
+    <Badge
+      variant="soft"
+      className="ml-auto min-w-6 justify-center"
+      aria-label={`${badgeCount} mesaje necitite`}
+    >
+      {badgeCount}
+    </Badge>
+  );
   const dot = badgeCount ? (
     <span
       aria-hidden
@@ -377,7 +445,10 @@ function NavRow({
           <Icon className={cn(iconBase, groupActive && "text-primary")} aria-hidden />
           {label}
           <ChevronDown
-            className={cn("ml-auto size-4 transition-transform duration-200", projectsOpen && "rotate-180")}
+            className={cn(
+              "ml-auto size-4 transition-transform duration-200",
+              projectsOpen && "rotate-180",
+            )}
             aria-hidden
           />
         </button>
@@ -393,7 +464,11 @@ function NavRow({
             {item.children.map((c) => (
               <li key={c.to} className="pt-1">
                 <Link to={c.to} onClick={onNavigate} className={cn(itemBase, "min-h-10 py-2")}>
-                  {c.to === "/projects/active" ? t("app.active") : c.to === "/projects/archive" ? t("app.archive") : c.label}
+                  {c.to === "/projects/active"
+                    ? t("app.active")
+                    : c.to === "/projects/archive"
+                      ? t("app.archive")
+                      : c.label}
                 </Link>
               </li>
             ))}
@@ -408,7 +483,11 @@ function NavRow({
   if (collapsed) {
     return (
       <RailTip show label={badgeCount ? `${label} (${badgeCount})` : label}>
-        <Link to={item.to} aria-label={label} className={cn(itemBase, "size-11 justify-center p-0")}>
+        <Link
+          to={item.to}
+          aria-label={label}
+          className={cn(itemBase, "size-11 justify-center p-0")}
+        >
           <Icon className={iconBase} aria-hidden />
           {dot}
         </Link>
@@ -463,7 +542,10 @@ function TierCard({ user, collapsed }: { user: User; collapsed: boolean }) {
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        <div className="h-full rounded-full bg-on-gradient transition-[width] duration-500" style={{ width: `${progress.percent}%` }} />
+        <div
+          className="h-full rounded-full bg-on-gradient transition-[width] duration-500"
+          style={{ width: `${progress.percent}%` }}
+        />
       </div>
     </div>
   );

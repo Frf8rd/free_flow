@@ -4,10 +4,9 @@ import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImagePreview } from "@/components/common/ImagePreview";
 import { useI18n } from "@/i18n";
+import { isAcceptedImageType, MAX_IMAGE_SIZE_BYTES } from "@/lib/image-uploads";
 
-const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_COUNT = 5;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 interface ImageUploadProps {
   files: File[];
@@ -44,11 +43,11 @@ export function ImageUpload({
     let validationError: string | null = null;
 
     for (const file of selected) {
-      if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+      if (!isAcceptedImageType(file)) {
         validationError ??= t("upload.invalidType");
         continue;
       }
-      if (file.size > MAX_IMAGE_SIZE) {
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
         validationError ??= t("upload.tooLarge");
         continue;
       }

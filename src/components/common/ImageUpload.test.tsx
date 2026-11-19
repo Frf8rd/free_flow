@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImageUpload } from "./ImageUpload";
 import { ImagePreview } from "./ImagePreview";
+import { AvatarUpload } from "./AvatarUpload";
 import { I18nProvider, LOCALE_STORAGE_KEY } from "@/i18n";
 
 const originalCreateObjectURL = URL.createObjectURL;
@@ -91,5 +92,43 @@ describe("ImageUpload", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("previews a valid profile avatar", () => {
+    function DemoAvatar() {
+      const [file, setFile] = useState<File | null>(null);
+      const [removeAvatar, setRemoveAvatar] = useState(false);
+      return (
+        <AvatarUpload
+          name="Ana Pop"
+          file={file}
+          removeAvatar={removeAvatar}
+          onFileChange={(nextFile) => {
+            setFile(nextFile);
+            setRemoveAvatar(false);
+          }}
+          onRemove={() => {
+            setFile(null);
+            setRemoveAvatar(true);
+          }}
+        />
+      );
+    }
+
+    render(
+      <I18nProvider>
+        <DemoAvatar />
+      </I18nProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Alege fotografia de profil"), {
+      target: { files: [new File(["image"], "avatar.png", { type: "image/png" })] },
+    });
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mărește imaginea: Ana Pop · Fotografie de profil",
+      }),
+    ).toBeTruthy();
   });
 });

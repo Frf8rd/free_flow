@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Lightbulb, Send, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { formatBudget, formatDate, formatRate, initials } from "@/lib/format";
+import { formatBudget, formatDate, formatRate } from "@/lib/format";
 import type { Match, MatchBreakdown, ProjectMatch } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Bar } from "@/components/common/states";
 import { ImagePreview } from "@/components/common/ImagePreview";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import { ScoreRing } from "./ScoreRing";
 import { TalentBadge } from "@/components/freelancer/TalentBadge";
 import { TierBadge } from "@/components/freelancer/TierBadge";
@@ -140,12 +141,7 @@ export function MatchCard({
       aria-label={`Potrivire: ${f.name}`}
     >
       <div className="flex items-start gap-4">
-        <div
-          aria-hidden
-          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary-soft-foreground"
-        >
-          {initials(f.name)}
-        </div>
+        <UserAvatar name={f.name} imageUrl={f.avatarUrl} className="size-12 text-sm" />
         <div className="min-w-0 flex-1">
           <Link
             to="/freelancers/$id"

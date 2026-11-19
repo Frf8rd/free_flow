@@ -44,6 +44,8 @@ export const browseQuery = (f: BrowseFilters) =>
   queryOptions({ queryKey: ["freelancers", "browse", f], queryFn: () => matchesService.browse(f) });
 export const freelancerQuery = (id: string) =>
   queryOptions({ queryKey: ["freelancers", id], queryFn: () => matchesService.getFreelancer(id) });
+export const myFreelancerProfileQuery = () =>
+  queryOptions({ queryKey: ["freelancers", "me"], queryFn: () => matchesService.getMyProfile() });
 export const reviewsQuery = (id: string) =>
   queryOptions({
     queryKey: ["freelancers", id, "reviews"],

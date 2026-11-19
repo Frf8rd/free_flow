@@ -15,6 +15,7 @@ import { MOCK_SELF_FREELANCER_ID, clone, getDb, mockDelay, nextId } from "@/mock
 import { api } from "./api";
 import { USE_MOCKS } from "./config";
 import { createImageFormData, createImageUrls } from "@/lib/image-uploads";
+import { useAuthStore } from "@/store/auth";
 
 const mock = async <T>(fn: () => T, ms = 300): Promise<T> => {
   await mockDelay(ms);
@@ -45,16 +46,46 @@ export const engagementsService = {
   async review(id: string, input: ReviewInput): Promise<void> {
     if (!USE_MOCKS) return void (await api.post(`/engagements/${id}/reviews`, input));
     await mockDelay();
-    const e = getDb().engagements.find((x) => x.id === id);
-    if (e)
-      e.review = {
-        id: nextId("r"),
-        authorName: e.client.name,
-        rating: input.rating,
-        comment: input.comment,
-        projectTitle: e.projectTitle,
-        createdAt: new Date().toISOString(),
-      };
+    const db = getDb();
+    const engagement = db.engagements.find((item) => item.id === id);
+    if (!engagement) throw new Error("Colaborarea nu a fost găsită.");
+    const user = useAuthStore.getState().user;
+    if (user?.role !== "CLIENT" || user.id !== engagement.client.id) {
+      throw new Error("Doar clientul colaborării poate lăsa o recenzie.");
+    }
+    if (engagement.status !== "COMPLETED") {
+      throw new Error("Poți evalua doar o colaborare finalizată.");
+    }
+    if (engagement.review)
+      throw new Error("A fost deja trimisă o recenzie pentru această colaborare.");
+    if (
+      !Number.isInteger(input.rating) ||
+      input.rating < 1 ||
+      input.rating > 5 ||
+      input.comment.trim().length < 5
+    ) {
+      throw new Error("Alege o notă de la 1 la 5 și scrie cel puțin 5 caractere.");
+    }
+    const freelancer = db.freelancers.find((item) => item.id === engagement.freelancer.id);
+    if (!freelancer) throw new Error("Profilul freelancerului nu a fost găsit.");
+
+    const review = {
+      id: nextId("r"),
+      authorName: engagement.client.name,
+      rating: input.rating,
+      comment: input.comment.trim(),
+      projectTitle: engagement.projectTitle,
+      createdAt: new Date().toISOString(),
+    };
+    engagement.review = review;
+    const freelancerReviews = (db.reviews[freelancer.id] ??= []);
+    freelancerReviews.unshift(review);
+    freelancer.reviewsCount = freelancerReviews.length;
+    freelancer.rating = Number(
+      (
+        freelancerReviews.reduce((sum, item) => sum + item.rating, 0) / freelancer.reviewsCount
+      ).toFixed(1),
+    );
   },
 };
 
@@ -137,12 +168,14 @@ export const portfolioService = {
     if (!USE_MOCKS) {
       if (images.length) {
         const formData = createImageFormData(fields, images);
-        if (id) await api.patch(`/freelancers/me/portfolio/${id}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        else await api.post("/freelancers/me/portfolio", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        if (id)
+          await api.patch(`/freelancers/me/portfolio/${id}`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        else
+          await api.post("/freelancers/me/portfolio", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
         return;
       }
       if (id) await api.patch(`/freelancers/me/portfolio/${id}`, fields);
@@ -159,9 +192,7 @@ export const portfolioService = {
           ? {
               ...p,
               ...fields,
-              ...(imageUrls.length
-                ? { imageUrls: [...(p.imageUrls ?? []), ...imageUrls] }
-                : {}),
+              ...(imageUrls.length ? { imageUrls: [...(p.imageUrls ?? []), ...imageUrls] } : {}),
             }
           : p,
       );

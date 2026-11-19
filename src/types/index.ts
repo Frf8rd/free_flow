@@ -27,6 +27,7 @@ export interface User {
   email: string;
   role: Role;
   profileComplete: boolean;
+  avatarUrl?: string | undefined;
   tierProgress?: TierProgress | undefined;
 }
 
@@ -84,6 +85,7 @@ export interface Category {
 export interface FreelancerSummary {
   id: string;
   name: string;
+  avatarUrl?: string | undefined;
   /** e.g. "Frontend developer" */
   headline: string;
   skills: string[];
@@ -96,6 +98,9 @@ export interface FreelancerSummary {
   categoryId: string;
   rating: number | null;
   reviewsCount: number;
+  location?: string | undefined;
+  experienceYears?: number | undefined;
+  website?: string | undefined;
 }
 
 export interface PortfolioItem {
@@ -127,6 +132,11 @@ export interface FreelancerProfileInput {
   hourlyRate: number;
   availability: Availability;
   languages: string[];
+  location?: string | undefined;
+  experienceYears?: number | undefined;
+  website?: string | undefined;
+  avatar?: File | undefined;
+  removeAvatar?: boolean | undefined;
 }
 
 export interface Review {

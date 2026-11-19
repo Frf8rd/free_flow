@@ -9,7 +9,8 @@ import { EmptyState, ErrorState } from "@/components/common/states";
 import { TalentBadge } from "@/components/freelancer/TalentBadge";
 import { TierBadge } from "@/components/freelancer/TierBadge";
 import { browseQuery, categoriesQuery } from "@/hooks/use-queries";
-import { availabilityLabel, formatRate, initials } from "@/lib/format";
+import { availabilityLabel, formatRate } from "@/lib/format";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import type { Availability, BrowseFilters } from "@/types";
 
 const selectCls =
@@ -142,12 +143,11 @@ export function BrowsePage() {
                       className="surface-card block h-full p-6 transition-all hover:-translate-y-0.5 hover:border-primary"
                     >
                       <div className="flex items-center gap-3">
-                        <span
-                          aria-hidden
-                          className="flex size-11 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary-soft-foreground"
-                        >
-                          {initials(f.name)}
-                        </span>
+                        <UserAvatar
+                          name={f.name}
+                          imageUrl={f.avatarUrl}
+                          className="size-11 text-sm"
+                        />
                         <div className="min-w-0">
                           <p className="font-display text-lg">{f.name}</p>
                           <p className="truncate text-small text-muted-foreground">{f.headline}</p>

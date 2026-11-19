@@ -69,10 +69,12 @@ function ReviewForm({ e, onDone }: { e: Engagement; onDone: () => void }) {
 function EngagementCard({
   e,
   isClient,
+  canReview,
   onChange,
 }: {
   e: Engagement;
   isClient: boolean;
+  canReview: boolean;
   onChange: () => void;
 }) {
   const { locale } = useI18n();
@@ -157,7 +159,7 @@ function EngagementCard({
             {e.review.comment}
           </p>
         ) : (
-          <ReviewForm e={e} onDone={onChange} />
+          canReview && <ReviewForm e={e} onDone={onChange} />
         ))}
     </article>
   );
@@ -165,9 +167,14 @@ function EngagementCard({
 
 export function CollaborationsPage() {
   const qc = useQueryClient();
-  const isClient = useAuthStore((s) => s.user?.role) !== "FREELANCER";
+  const role = useAuthStore((s) => s.user?.role);
+  const isClient = role !== "FREELANCER";
+  const canReview = role === "CLIENT";
   const { data, isLoading, isError, refetch } = useQuery(engagementsQuery());
-  const change = () => void qc.invalidateQueries({ queryKey: ["engagements"] });
+  const change = () => {
+    void qc.invalidateQueries({ queryKey: ["engagements"] });
+    void qc.invalidateQueries({ queryKey: ["freelancers"] });
+  };
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
@@ -187,7 +194,15 @@ export function CollaborationsPage() {
             text="Când un client și un freelancer se înțeleg, colaborarea apare aici."
           />
         ) : (
-          data.map((e) => <EngagementCard key={e.id} e={e} isClient={isClient} onChange={change} />)
+          data.map((e) => (
+            <EngagementCard
+              key={e.id}
+              e={e}
+              isClient={isClient}
+              canReview={canReview}
+              onChange={change}
+            />
+          ))
         )}
       </div>
     </div>
