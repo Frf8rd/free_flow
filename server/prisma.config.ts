@@ -4,6 +4,12 @@
 import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
+const migrationUrl = process.env.DIRECT_URL || env("DATABASE_URL");
+const isDatabaseChangeCommand = process.argv.some((argument) => ["migrate", "db"].includes(argument));
+if (isDatabaseChangeCommand && !process.env.DIRECT_URL && /-pooler\./i.test(migrationUrl)) {
+  throw new Error("Prisma migrations need a direct database connection. Set DIRECT_URL in server/.env to Neon's direct (non-pooler) connection string.");
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -11,6 +17,6 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: migrationUrl,
   },
 });

@@ -4,6 +4,8 @@ const accessRoutes = require("./access.routes");
 const catalogRoutes = require("./catalog.routes");
 const projectsRoutes = require("./projects.routes");
 const adminRoutes = require("./admin.routes");
+const engagementRoutes = require("./engagements.routes");
+const conversationRoutes = require("./conversations.routes");
 
 const router = Router();
 
@@ -13,5 +15,7 @@ router.use("/access", accessRoutes);
 router.use("/", catalogRoutes);
 router.use("/projects", projectsRoutes);
 router.use("/admin", adminRoutes);
+router.use("/engagements", engagementRoutes);
+router.use("/conversations", conversationRoutes);
 
 module.exports = router;
