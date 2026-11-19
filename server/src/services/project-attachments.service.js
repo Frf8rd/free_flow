@@ -19,7 +19,7 @@ async function assertCanView(user, project, db = prisma) {
   const acceptedEngagement = await db.engagement.findFirst({
     where: {
       projectId: project.id,
-      status: "ACCEPTED",
+      status: { in: ["IN_PROGRESS", "DELIVERED", "COMPLETED"] },
       OR: [{ clientId: user.id }, { freelancerId: user.id }],
     },
     select: { id: true },

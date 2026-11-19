@@ -1,9 +1,12 @@
 const projectsService = require("../services/projects.service");
 const { writeAuditLog } = require("../utils/auditLog");
+const { getIo } = require("../realtime");
 
 async function create(req, res) {
   const project = await projectsService.createProject(req.user.id, req.body);
   writeAuditLog("project.created", { actorId: req.user.id, resourceId: project.id });
+  const io = getIo();
+  if (io) io.to("projects:browse").emit("projects:new", { id: project.id, createdAt: project.createdAt });
   res.status(201).json({ data: project });
 }
 

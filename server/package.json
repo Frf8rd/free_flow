@@ -23,7 +23,8 @@
     "multer": "^2.5.0",
     "nodemailer": "^10.6.0",
     "prisma": "^6.19.3",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
