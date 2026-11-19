@@ -14,6 +14,7 @@ import { authService, getErrorMessage } from "@/services";
 import { useAuthStore } from "@/store/auth";
 import { MOCK_WRONG_PASSWORD } from "@/mocks/users";
 import { useI18n } from "@/i18n";
+import { GoogleSignInButton } from "@/components/layout/GoogleSignInButton";
 
 export function LoginPage() {
   const { t } = useI18n();
@@ -88,6 +89,7 @@ export function LoginPage() {
           </p>
         )}
       </form>
+      <GoogleSignInButton />
     </AuthCard>
   );
 }

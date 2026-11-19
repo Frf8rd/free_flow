@@ -7,7 +7,7 @@ export function PublicFooter() {
   const { t } = useI18n();
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
+      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
         <div className="max-w-xs">
           <Brand />
           <p className="mt-3 text-small text-muted-foreground">
@@ -15,19 +15,11 @@ export function PublicFooter() {
           </p>
         </div>
         <FooterCol title={t("footer.product")}>
-          <FooterLink to="/" hash="cum-functioneaza">{t("nav.how")}</FooterLink>
-          <FooterLink to="/" hash="echitate">{t("nav.fairness")}</FooterLink>
-          <FooterLink to="/" hash="trepte">{t("nav.tiers")}</FooterLink>
           <FooterLink to="/browse">{t("nav.browse")}</FooterLink>
         </FooterCol>
         <FooterCol title="Începe">
-          <FooterLink to="/" hash="pentru-clienti">{t("nav.clients")}</FooterLink>
-          <FooterLink to="/" hash="pentru-freelanceri">{t("nav.freelancers")}</FooterLink>
           <FooterLink to="/register">{t("nav.register")}</FooterLink>
           <FooterLink to="/login">{t("nav.login")}</FooterLink>
-        </FooterCol>
-        <FooterCol title="Ajutor">
-          <FooterLink to="/" hash="intrebari">Întrebări frecvente</FooterLink>
         </FooterCol>
       </div>
       <div className="border-t border-border">

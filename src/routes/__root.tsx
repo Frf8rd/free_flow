@@ -64,8 +64,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Platformă de freelancing cu potrivire automată între clienți și freelanceri." },
       { property: "og:title", content: "FairMatch" },
       { property: "og:description", content: "Platformă de freelancing cu potrivire automată între clienți și freelanceri." },
+      { property: "og:image", content: "/fairmatch-logo.png" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "/fairmatch-logo.png" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -76,6 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "apple-touch-icon", href: "/fairmatch-mark.png" },
     ],
     scripts: [{ children: themeScript }],
   }),

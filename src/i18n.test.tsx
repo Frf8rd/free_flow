@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useState } from "react";
+import { toast } from "sonner";
+import { GoogleSignInButton } from "@/components/layout/GoogleSignInButton";
 import { I18nProvider, LOCALE_STORAGE_KEY, translatePhrase, useI18n } from "./i18n";
 
 describe("translatePhrase", () => {
@@ -16,6 +18,22 @@ describe("translatePhrase", () => {
 
   it("keeps Romanian text unchanged for the Romanian locale", () => {
     expect(translatePhrase("Setări", "ro")).toBe("Setări");
+  });
+
+  it("shows a localized Google sign-in button and explains that OAuth is not configured", () => {
+    localStorage.removeItem(LOCALE_STORAGE_KEY);
+    const info = vi.spyOn(toast, "info").mockImplementation(() => "");
+    render(
+      <I18nProvider>
+        <GoogleSignInButton />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuă cu Google" }));
+    expect(info).toHaveBeenCalledWith(
+      "Autentificarea cu Google va funcționa după conectarea backendului OAuth.",
+    );
+    info.mockRestore();
   });
 
   it("translates existing and dynamically updated page text when the locale changes", async () => {

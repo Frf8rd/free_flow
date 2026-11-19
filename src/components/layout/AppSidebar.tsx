@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BrandDot } from "./Brand";
+import { BrandMark } from "./Brand";
 import { ThemeCycleButton, ThemeSwitch } from "./ThemeSwitch";
 import { useI18n } from "@/i18n";
 
@@ -79,8 +79,8 @@ export function SidebarContent({ collapsed = false, mobile = false }: SidebarCon
           aria-label="FairMatch — Dashboard"
           className={cn("flex min-h-11 items-center gap-2.5 rounded-full", collapsed && "justify-center")}
         >
-          <BrandDot />
-          {!collapsed && <span className="font-display text-xl leading-none">FairMatch</span>}
+          <BrandMark />
+          {!collapsed && <span className="font-sans text-sm font-bold tracking-[0.12em]">FAIRMATCH</span>}
         </Link>
         {mobile ? (
           <button

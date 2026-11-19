@@ -14,6 +14,7 @@ import { passwordStrength, registerSchema, type RegisterValues } from "@/lib/val
 import { authService, getErrorMessage } from "@/services";
 import { useAuthStore } from "@/store/auth";
 import { useI18n } from "@/i18n";
+import { GoogleSignInButton } from "@/components/layout/GoogleSignInButton";
 
 const roleCards = [
   { value: "CLIENT" as const, title: "Client", text: "Am un proiect și caut freelancerul potrivit.", icon: Briefcase },
@@ -174,6 +175,7 @@ export function RegisterPage({ initialRole }: { initialRole?: "client" | "freela
           {mutation.isPending ? t("auth.creating") : t("auth.register")}
         </Button>
       </form>
+      <GoogleSignInButton />
     </AuthCard>
   );
 }
