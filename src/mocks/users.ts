@@ -1,5 +1,8 @@
 import type { Role, User } from "@/types";
 
+export const MOCK_ADMIN_EMAIL = "admin@exemplu.ro";
+export const MOCK_ADMIN_PASSWORD = "fairmatch-demo";
+
 export const mockUsers: Record<Role, User> = {
   CLIENT: {
     id: "u-client-1",
@@ -26,7 +29,7 @@ export const mockUsers: Record<Role, User> = {
   ADMIN: {
     id: "u-admin-1",
     name: "Nume Prenume",
-    email: "admin@exemplu.ro",
+    email: MOCK_ADMIN_EMAIL,
     role: "ADMIN",
     profileComplete: true,
   },
