@@ -300,3 +300,25 @@ model Report {
 
   @@index([freelancerId, createdAt])
 }
+model FreelancerProfile {
+  userId       String       @id
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hourlyRate   Int?
+  availability Availability @default(AVAILABLE)
+  skills       FreelancerSkill[]
+}
+
+enum Availability {
+  AVAILABLE
+  PART_TIME
+  UNAVAILABLE
+}
+
+model FreelancerSkill {
+  userId  String
+  skillId String
+  profile FreelancerProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  skill   Skill             @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+}

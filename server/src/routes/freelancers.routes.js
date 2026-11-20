@@ -3,6 +3,7 @@ const { authenticate } = require("../middlewares/auth");
 const { requireRole } = require("../middlewares/requireRole");
 const { rateLimit } = require("../middlewares/rateLimit");
 const controller = require("../controllers/freelancers.controller");
+const searchController = require("../controllers/freelancers-search.controller");
 
 const router = Router();
 const mutationLimiter = rateLimit({
@@ -13,6 +14,10 @@ const mutationLimiter = rateLimit({
 
 router.use(authenticate);
 
+// KAN-58: căutare cu filtre și paginare. Trebuie declarată înaintea lui /:id.
+router.get("/", searchController.list);
+
+// Rutele /me trebuie declarate înaintea lui /:id
 router.get("/me", requireRole("FREELANCER"), controller.getMe);
 router.put("/me", requireRole("FREELANCER"), mutationLimiter, controller.updateMe);
 
