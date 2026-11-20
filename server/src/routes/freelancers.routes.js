@@ -4,6 +4,7 @@ const { requireRole } = require("../middlewares/requireRole");
 const { rateLimit } = require("../middlewares/rateLimit");
 const controller = require("../controllers/freelancers.controller");
 const searchController = require("../controllers/freelancers-search.controller");
+const reviewsController = require("../controllers/reviews.controller");
 
 const router = Router();
 const mutationLimiter = rateLimit({
@@ -26,6 +27,7 @@ router.post("/me/portfolio", requireRole("FREELANCER"), mutationLimiter, control
 router.put("/me/portfolio/:itemId", requireRole("FREELANCER"), mutationLimiter, controller.updatePortfolioItem);
 router.delete("/me/portfolio/:itemId", requireRole("FREELANCER"), mutationLimiter, controller.deletePortfolioItem);
 
+router.get("/:id/reviews", reviewsController.listForFreelancer);
 router.get("/:id", controller.getById);
 
 module.exports = router;
