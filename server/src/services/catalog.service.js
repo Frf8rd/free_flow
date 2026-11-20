@@ -1,25 +1,27 @@
-const prisma = require('../config/prisma');
+const prisma = require("../config/prisma");
 
-async function listCategories() {
-  return prisma.category.findMany({
+async function listCategories(db = prisma) {
+  return db.category.findMany({
     select: { id: true, name: true },
-    orderBy: { name: 'asc' },
+    orderBy: { name: "asc" },
   });
 }
 
-async function listSkills({ categoryId, q }) {
+// Răspunsul păstrează categoryId (cum îl returna backend) și adaugă category { id, name }.
+async function listSkills({ categoryId, q } = {}, db = prisma) {
   const where = {};
   if (categoryId) where.categoryId = categoryId;
-  if (q) where.name = { contains: q, mode: 'insensitive' };
+  if (q) where.name = { contains: q, mode: "insensitive" };
 
-  return prisma.skill.findMany({
+  return db.skill.findMany({
     where,
     select: {
       id: true,
       name: true,
+      categoryId: true,
       category: { select: { id: true, name: true } },
     },
-    orderBy: { name: 'asc' },
+    orderBy: { name: "asc" },
   });
 }
 

@@ -1,0 +1,257 @@
+const prisma = require("../config/prisma");
+const { AppError } = require("../utils/errors");
+const { isAdminAllowlisted } = require("../utils/adminAccess");
+
+const ROLES = new Set(["CLIENT", "FREELANCER", "ADMIN"]);
+const PROJECT_STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED"]);
+const REPORT_STATUSES = new Set(["OPEN", "RESOLVED", "DISMISSED"]);
+
+function parsePagination(query = {}) {
+  const page = query.page === undefined ? 1 : Number(query.page);
+  const limit = query.limit === undefined ? 20 : Number(query.limit);
+  if (!Number.isInteger(page) || page < 1) {
+    throw new AppError(400, "VALIDATION_ERROR", "Parametrul page trebuie să fie pozitiv.");
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new AppError(400, "VALIDATION_ERROR", "Parametrul limit trebuie să fie între 1 și 100.");
+  }
+  return { page, limit };
+}
+
+function optionalEnum(value, allowed, field) {
+  if (value === undefined || value === "") return undefined;
+  if (typeof value !== "string" || !allowed.has(value)) {
+    throw new AppError(400, "VALIDATION_ERROR", `Filtrul ${field} nu este valid.`);
+  }
+  return value;
+}
+
+function searchFilter(value) {
+  if (value === undefined || value === "") return undefined;
+  if (typeof value !== "string" || value.trim().length > 100) {
+    throw new AppError(400, "VALIDATION_ERROR", "Căutarea trebuie să aibă maximum 100 de caractere.");
+  }
+  return value.trim();
+}
+
+async function listUsers(query = {}, db = prisma) {
+  const { page, limit } = parsePagination(query);
+  const search = searchFilter(query.search);
+  const role = optionalEnum(query.role, ROLES, "rol");
+  let isBlocked;
+  if (query.blocked !== undefined && query.blocked !== "") {
+    if (!["true", "false"].includes(query.blocked)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Filtrul blocked trebuie să fie true sau false.");
+    }
+    isBlocked = query.blocked === "true";
+  }
+  const where = {
+    ...(role ? { role } : {}),
+    ...(isBlocked === undefined ? {} : { isBlocked }),
+    ...(search
+      ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] }
+      : {}),
+  };
+  const [total, data] = await Promise.all([
+    db.user.count({ where }),
+    db.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isBlocked: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+  return { data, page, limit, total };
+}
+
+async function updateUser(adminId, userId, input, db = prisma) {
+  if (typeof userId !== "string" || !userId.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Identificatorul utilizatorului nu este valid.");
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new AppError(400, "VALIDATION_ERROR", "Modificările utilizatorului sunt invalide.");
+  }
+  const fields = Object.keys(input);
+  if (
+    fields.length === 0 ||
+    fields.some((field) => !["role", "isBlocked"].includes(field)) ||
+    (input.role !== undefined && !ROLES.has(input.role)) ||
+    (input.isBlocked !== undefined && typeof input.isBlocked !== "boolean")
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Specifică un rol valid sau starea de blocare.");
+  }
+  if (adminId === userId && (input.role !== undefined || input.isBlocked === true)) {
+    throw new AppError(400, "SELF_ADMIN_CHANGE", "Nu poți să-ți schimbi rolul sau să-ți blochezi propriul cont.");
+  }
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, role: true, isBlocked: true },
+  });
+  if (!target) throw new AppError(404, "USER_NOT_FOUND", "Utilizatorul nu a fost găsit.");
+
+  if (input.role === "ADMIN" && target.role !== "ADMIN" && !(await isAdminAllowlisted(target.email, db))) {
+    throw new AppError(403, "ADMIN_NOT_ALLOWLISTED", "Adaugă emailul în allowlist înainte de a acorda rolul ADMIN.");
+  }
+
+  const data = { ...input };
+  if (
+    (input.role !== undefined && input.role !== target.role) ||
+    (input.isBlocked === true && !target.isBlocked)
+  ) {
+    data.tokenVersion = { increment: 1 };
+  }
+  return db.user.update({
+    where: { id: target.id },
+    data,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isBlocked: true,
+      emailVerifiedAt: true,
+      createdAt: true,
+    },
+  });
+}
+
+async function listProjects(query = {}, db = prisma) {
+  const { page, limit } = parsePagination(query);
+  const search = searchFilter(query.search);
+  const status = optionalEnum(query.status, PROJECT_STATUSES, "status");
+  const where = {
+    ...(status ? { status } : {}),
+    ...(search
+      ? {
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { client: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      }
+      : {}),
+  };
+  const [total, data] = await Promise.all([
+    db.project.count({ where }),
+    db.project.findMany({
+      where,
+      include: {
+        client: { select: { id: true, name: true, email: true } },
+        category: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+  return { data, page, limit, total };
+}
+
+async function deleteProject(projectId, db = prisma) {
+  if (typeof projectId !== "string" || !projectId.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Identificatorul proiectului nu este valid.");
+  }
+  const project = await db.project.findUnique({
+    where: { id: projectId.trim() },
+    select: { id: true },
+  });
+  if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  await db.project.delete({ where: { id: project.id } });
+  return project;
+}
+
+async function listReports(query = {}, db = prisma) {
+  const { page, limit } = parsePagination(query);
+  const status = optionalEnum(query.status, REPORT_STATUSES, "status");
+  const where = status ? { status } : {};
+  const [total, data] = await Promise.all([
+    db.report.count({ where }),
+    db.report.findMany({
+      where,
+      include: {
+        reporter: { select: { id: true, name: true, email: true } },
+        resolvedBy: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+  return { data, page, limit, total };
+}
+
+async function resolveReport(adminId, reportId, input, db = prisma) {
+  if (typeof reportId !== "string" || !reportId.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Identificatorul raportului nu este valid.");
+  }
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    Object.keys(input).some((field) => !["status", "resolution"].includes(field)) ||
+    !["RESOLVED", "DISMISSED"].includes(input.status) ||
+    (input.resolution !== undefined &&
+      (typeof input.resolution !== "string" || input.resolution.trim().length > 1000))
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Statusul sau rezoluția raportului nu sunt valide.");
+  }
+  const report = await db.report.findUnique({
+    where: { id: reportId.trim() },
+    select: { id: true },
+  });
+  if (!report) throw new AppError(404, "REPORT_NOT_FOUND", "Raportul nu a fost găsit.");
+
+  return db.report.update({
+    where: { id: report.id },
+    data: {
+      status: input.status,
+      resolution: input.resolution?.trim() || null,
+      resolvedById: adminId,
+      resolvedAt: new Date(),
+    },
+    include: {
+      reporter: { select: { id: true, name: true, email: true } },
+      resolvedBy: { select: { id: true, name: true } },
+    },
+  });
+}
+
+async function getStats(db = prisma) {
+  const [users, projects, reports, usersByRole, projectsByStatus, reportsByStatus] = await Promise.all([
+    db.user.count(),
+    db.project.count(),
+    db.report.count(),
+    db.user.groupBy({ by: ["role"], _count: { _all: true } }),
+    db.project.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.report.groupBy({ by: ["status"], _count: { _all: true } }),
+  ]);
+  const toCounts = (rows, key) => Object.fromEntries(
+    rows.map((row) => [row[key], row._count._all]),
+  );
+  return {
+    totals: { users, projects, reports },
+    usersByRole: toCounts(usersByRole, "role"),
+    projectsByStatus: toCounts(projectsByStatus, "status"),
+    reportsByStatus: toCounts(reportsByStatus, "status"),
+  };
+}
+
+module.exports = {
+  listUsers,
+  updateUser,
+  listProjects,
+  deleteProject,
+  listReports,
+  resolveReport,
+  getStats,
+};

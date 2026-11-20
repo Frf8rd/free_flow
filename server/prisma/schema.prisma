@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -14,27 +14,289 @@ enum Role {
   ADMIN
 }
 
+enum AuthProvider {
+  GOOGLE
+}
+
+enum ProjectStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+enum AccountTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+enum ReportTargetType {
+  USER
+  PROJECT
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role
-  avatarUrl    String?
-  isBlocked    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String?
+  name            String
+  role            Role
+  avatarUrl       String?
+  isBlocked       Boolean   @default(false)
+  tokenVersion    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  adminAccess   Admin?
+  refreshTokens RefreshToken[]
+  oauthAccounts OAuthAccount[]
+  projects      Project[]
+  accountTokens AccountToken[]
+  submittedReports Report[] @relation("ReportReporter")
+  resolvedReports Report[] @relation("ReportResolver")
+  clientEngagements Engagement[] @relation("EngagementClient")
+  freelancerEngagements Engagement[] @relation("EngagementFreelancer")
+  clientConversations Conversation[] @relation("ConversationClient")
+  freelancerConversations Conversation[] @relation("ConversationFreelancer")
+  sentMessages Message[]
+  projectAttachments ProjectAttachment[]
+}
+
+model Admin {
+  email     String   @id
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [email], references: [email], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model OAuthAccount {
+  id                String       @id @default(cuid())
+  provider          AuthProvider
+  providerUserId    String
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime     @default(now())
+
+  @@unique([provider, providerUserId])
+  @@unique([userId, provider])
+}
+
+model OAuthChallenge {
+  id        String       @id @default(cuid())
+  provider  AuthProvider
+  nonceHash String       @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([provider, expiresAt])
+}
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
 }
 
 model Category {
-  id     String  @id @default(cuid())
-  name   String  @unique
-  skills Skill[]
+  id       String    @id @default(cuid())
+  name     String    @unique
+  skills   Skill[]
+  projects Project[]
 }
 
 model Skill {
   id         String   @id @default(cuid())
   name       String   @unique
   categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  projects ProjectSkill[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      User          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  budgetMin   Int?
+  budgetMax   Int?
+  deadline    DateTime?
+  status      ProjectStatus @default(OPEN)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  skills ProjectSkill[]
+  engagements Engagement[]
+  attachments ProjectAttachment[]
+
+  @@index([status, categoryId])
+}
+
+enum EngagementStatus {
+  PENDING
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model Engagement {
+  id           String           @id @default(cuid())
+  projectId    String
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       User             @relation("EngagementClient", fields: [clientId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer   User             @relation("EngagementFreelancer", fields: [freelancerId], references: [id], onDelete: Cascade)
+  status       EngagementStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deliveredAt  DateTime?
+  completedAt  DateTime?
+  rejectedAt   DateTime?
+  cancelledAt  DateTime?
+  conversation Conversation?
+
+  @@unique([projectId, freelancerId])
+  @@index([clientId, status, createdAt])
+  @@index([freelancerId, createdAt])
+}
+
+model Conversation {
+  id           String      @id @default(cuid())
+  engagementId String      @unique
+  engagement  Engagement  @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       User        @relation("ConversationClient", fields: [clientId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer   User        @relation("ConversationFreelancer", fields: [freelancerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  messages     Message[]
+
+  @@index([clientId, updatedAt])
+  @@index([freelancerId, updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt, id])
+  @@index([conversationId, readAt])
+}
+
+model ProjectSkill {
+  projectId String
+  skillId   String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, skillId])
+}
+
+model ProjectAttachment {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploaderId   String
+  uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  storageKey   String   @unique
+  mimeType     String
+  sizeBytes    Int
+  originalName String
+  createdAt    DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+model AccountToken {
+  id         String              @id @default(cuid())
+  tokenHash  String              @unique
+  purpose    AccountTokenPurpose
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, purpose, expiresAt])
+}
+
+model PendingRegistration {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Report {
+  id           String           @id @default(cuid())
+  reporterId   String
+  reporter     User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType   ReportTargetType
+  targetId     String
+  reason       String
+  details      String?
+  status       ReportStatus     @default(OPEN)
+  resolution   String?
+  resolvedById String?
+  resolvedBy   User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+
+
+  model PortfolioItem {
+  id           String   @id @default(cuid())
+  freelancerId String
+  freelancer   User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  url          String?
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([freelancerId, createdAt])
 }

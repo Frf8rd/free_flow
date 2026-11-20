@@ -1,6 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
 
-// O singură instanță PrismaClient pentru tot serverul
+const { PrismaClient } = require("@prisma/client");
+
+
 const prisma = new PrismaClient();
 
 module.exports = prisma;

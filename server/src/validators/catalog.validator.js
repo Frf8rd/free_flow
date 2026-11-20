@@ -1,8 +1,8 @@
-const { z } = require('zod');
+const { z } = require("zod");
 
 const skillsQuerySchema = z.object({
-  categoryId: z.string().min(1).optional(),
-  q: z.string().trim().min(1).max(100).optional(),
+  categoryId: z.string().trim().min(1, "Categoria nu este validă.").optional(),
+  q: z.string().trim().min(1, "Căutarea nu este validă.").max(100, "Căutarea este prea lungă.").optional(),
 });
 
 module.exports = { skillsQuerySchema };
