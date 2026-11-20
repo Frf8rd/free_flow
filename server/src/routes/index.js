@@ -1,4 +1,3 @@
-const freelancersRoutes = require("./freelancers.routes");
 const { Router } = require("express");
 const authRoutes = require("./auth.routes");
 const accessRoutes = require("./access.routes");
@@ -7,6 +6,9 @@ const projectsRoutes = require("./projects.routes");
 const adminRoutes = require("./admin.routes");
 const engagementRoutes = require("./engagements.routes");
 const conversationRoutes = require("./conversations.routes");
+const freelancersRoutes = require("./freelancers.routes");
+const usersRoutes = require("./users.routes");
+const clientsRoutes = require("./clients.routes");
 
 const router = Router();
 
@@ -18,7 +20,8 @@ router.use("/projects", projectsRoutes);
 router.use("/admin", adminRoutes);
 router.use("/engagements", engagementRoutes);
 router.use("/conversations", conversationRoutes);
+router.use("/freelancers", freelancersRoutes);
+router.use("/users", usersRoutes);
+router.use("/clients", clientsRoutes);
 
 module.exports = router;
-router.use("/conversations", conversationRoutes);
-router.use("/freelancers", freelancersRoutes);
