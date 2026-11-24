@@ -1,107 +1,213 @@
-const prisma = require("../config/prisma");
-const { AppError } = require("../utils/errors");
+const prisma = require('../config/prisma');
+const { AppError } = require('../utils/errors');
 const {
   profileUpdateSchema,
   portfolioCreateSchema,
   portfolioUpdateSchema,
+  idSchema,
   parse,
-  parseId,
-} = require("../validators/freelancers.validator");
+} = require('../validators/freelancers.validator');
+const trustService = require('./trust.service');
 
-const MAX_PORTFOLIO_ITEMS = 30;
+const MAX_PORTFOLIO_ITEMS = 20;
 
 const portfolioSelect = {
   id: true,
   title: true,
   description: true,
-  url: true,
-  imageUrl: true,
+  projectUrl: true,
   createdAt: true,
   updatedAt: true,
 };
 
-const publicProfileSelect = {
+const freelancerSelect = {
   id: true,
   name: true,
   avatarUrl: true,
-  createdAt: true,
-  portfolioItems: { select: portfolioSelect, orderBy: { createdAt: "desc" } },
+  role: true,
+  isBlocked: true,
+  freelancerProfile: {
+    select: {
+      title: true,
+      bio: true,
+      level: true,
+      hourlyRate: true,
+      availability: true,
+      languages: true,
+      createdAt: true,
+      updatedAt: true,
+      skills: { select: { skill: { select: { id: true, name: true } } } },
+      portfolio: {
+        select: portfolioSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      },
+    },
+  },
 };
 
+// `id` este id-ul utilizatorului (același cu freelancerId din engagements).
+// Un freelancer fără profil salvat primește valorile implicite, nu 404.
+function toFreelancerDto(user) {
+  const profile = user.freelancerProfile;
+  return {
+    id: user.id,
+    name: user.name,
+    avatarUrl: user.avatarUrl ?? null,
+    title: profile?.title ?? '',
+    bio: profile?.bio ?? '',
+    level: profile?.level ?? 'BEGINNER',
+    hourlyRate: profile?.hourlyRate ?? null,
+    availability: profile?.availability ?? 'AVAILABLE',
+    languages: profile?.languages ?? [],
+    skills: (profile?.skills ?? [])
+      .map((entry) => entry.skill)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    portfolio: profile?.portfolio ?? [],
+    createdAt: profile?.createdAt ?? null,
+    updatedAt: profile?.updatedAt ?? null,
+  };
+}
+
+// Nivelul de încredere (KAN-36) se afișează pe profil: doar nivelul și eticheta, fără detalii.
+async function withTrustLevel(dto, db) {
+  return { ...dto, trustLevel: await trustService.getPublicTrust(dto.id, db) };
+}
+
+async function loadFreelancer(userId, db) {
+  return db.user.findUnique({ where: { id: userId }, select: freelancerSelect });
+}
+
 async function getMyProfile(userId, db = prisma) {
-  const profile = await db.user.findUnique({
-    where: { id: userId },
-    select: { ...publicProfileSelect, email: true },
-  });
-  if (!profile) throw new AppError(404, "NOT_FOUND", "Profilul nu a fost găsit.");
-  return profile;
+  const user = await loadFreelancer(userId, db);
+  if (!user) throw new AppError(404, 'FREELANCER_NOT_FOUND', 'Profilul nu a fost găsit.');
+  return withTrustLevel(toFreelancerDto(user), db);
+}
+
+async function getFreelancerProfile(id, db = prisma) {
+  const freelancerId = parse(idSchema, id);
+  const user = await loadFreelancer(freelancerId, db);
+  if (!user || user.role !== 'FREELANCER' || user.isBlocked) {
+    throw new AppError(404, 'FREELANCER_NOT_FOUND', 'Freelancerul nu a fost găsit.');
+  }
+  return withTrustLevel(toFreelancerDto(user), db);
+}
+
+// Două cereri simultane la prima salvare pot încerca să creeze ambele profilul (P2002) — a doua încercare îl găsește deja creat.
+async function retryOnUniqueConflict(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error && error.code === 'P2002') return operation();
+    throw error;
+  }
 }
 
 async function updateMyProfile(userId, input, db = prisma) {
-  const data = parse(profileUpdateSchema, input);
-  return db.user.update({
-    where: { id: userId },
-    data,
-    select: { ...publicProfileSelect, email: true },
-  });
+  const { skillIds, ...fields } = parse(profileUpdateSchema, input);
+
+  if (skillIds && skillIds.length) {
+    const skills = await db.skill.findMany({
+      where: { id: { in: skillIds } },
+      select: { id: true },
+    });
+    if (skills.length !== skillIds.length) {
+      throw new AppError(400, 'INVALID_SKILLS', 'Selectează abilități existente din catalog.');
+    }
+  }
+
+  const skillWrites = skillIds
+    ? skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } }))
+    : null;
+
+  await retryOnUniqueConflict(() =>
+    db.freelancerProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...fields,
+        ...(skillWrites ? { skills: { create: skillWrites } } : {}),
+      },
+      update: {
+        ...fields,
+        ...(skillWrites ? { skills: { deleteMany: {}, create: skillWrites } } : {}),
+      },
+      select: { id: true },
+    }),
+  );
+
+  return getMyProfile(userId, db);
 }
 
-async function getFreelancerById(id, db = prisma) {
-  const profile = await db.user.findFirst({
-    where: { id: parseId(id), role: "FREELANCER", isBlocked: false },
-    select: publicProfileSelect,
-  });
-  if (!profile) throw new AppError(404, "NOT_FOUND", "Freelancerul nu a fost găsit.");
-  return profile;
-}
-
-async function listPortfolio(userId, db = prisma) {
+async function listMyPortfolio(userId, db = prisma) {
   return db.portfolioItem.findMany({
-    where: { freelancerId: userId },
+    where: { profile: { userId } },
     select: portfolioSelect,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
 }
 
 async function createPortfolioItem(userId, input, db = prisma) {
   const data = parse(portfolioCreateSchema, input);
-  const count = await db.portfolioItem.count({ where: { freelancerId: userId } });
+
+  const profile = await retryOnUniqueConflict(() =>
+    db.freelancerProfile.upsert({
+      where: { userId },
+      create: { userId },
+      update: {},
+      select: { id: true },
+    }),
+  );
+
+  const count = await db.portfolioItem.count({ where: { profileId: profile.id } });
   if (count >= MAX_PORTFOLIO_ITEMS) {
-    throw new AppError(400, "PORTFOLIO_LIMIT", `Poți avea cel mult ${MAX_PORTFOLIO_ITEMS} lucrări în portofoliu.`);
+    throw new AppError(
+      409,
+      'PORTFOLIO_LIMIT_REACHED',
+      `Poți avea maximum ${MAX_PORTFOLIO_ITEMS} de lucrări în portofoliu.`,
+    );
   }
+
   return db.portfolioItem.create({
-    data: { ...data, freelancerId: userId },
+    data: { profileId: profile.id, ...data },
     select: portfolioSelect,
   });
 }
 
-// Elementul trebuie să aparțină utilizatorului curent.
-async function findOwnedItem(userId, itemId, db) {
-  const item = await db.portfolioItem.findFirst({
-    where: { id: parseId(itemId), freelancerId: userId },
-    select: { id: true },
+// Verificarea proprietății: elementul trebuie să existe și să aparțină profilului utilizatorului curent.
+async function findOwnedPortfolioItem(itemId, userId, db) {
+  const id = parse(idSchema, itemId);
+  const item = await db.portfolioItem.findUnique({
+    where: { id },
+    select: { id: true, profile: { select: { userId: true } } },
   });
-  if (!item) throw new AppError(404, "NOT_FOUND", "Lucrarea nu a fost găsită.");
+  if (!item) throw new AppError(404, 'PORTFOLIO_ITEM_NOT_FOUND', 'Lucrarea nu a fost găsită.');
+  if (item.profile.userId !== userId) {
+    throw new AppError(403, 'FORBIDDEN', 'Poți modifica doar lucrările din propriul portofoliu.');
+  }
   return item;
 }
 
 async function updatePortfolioItem(userId, itemId, input, db = prisma) {
   const data = parse(portfolioUpdateSchema, input);
-  const item = await findOwnedItem(userId, itemId, db);
-  return db.portfolioItem.update({ where: { id: item.id }, data, select: portfolioSelect });
+  const item = await findOwnedPortfolioItem(itemId, userId, db);
+  return db.portfolioItem.update({
+    where: { id: item.id },
+    data,
+    select: portfolioSelect,
+  });
 }
 
 async function deletePortfolioItem(userId, itemId, db = prisma) {
-  const item = await findOwnedItem(userId, itemId, db);
+  const item = await findOwnedPortfolioItem(itemId, userId, db);
   await db.portfolioItem.delete({ where: { id: item.id } });
 }
 
 module.exports = {
   MAX_PORTFOLIO_ITEMS,
   getMyProfile,
+  getFreelancerProfile,
   updateMyProfile,
-  getFreelancerById,
-  listPortfolio,
+  listMyPortfolio,
   createPortfolioItem,
   updatePortfolioItem,
   deletePortfolioItem,
