@@ -67,6 +67,9 @@ model User {
   freelancerConversations Conversation[] @relation("ConversationFreelancer")
   sentMessages Message[]
   projectAttachments ProjectAttachment[]
+  reviewsWritten Review[] @relation("ReviewAuthor")
+  reviewsReceived Review[] @relation("ReviewTarget")
+  portfolioItems PortfolioItem[]
 }
 
 model Admin {
@@ -181,6 +184,7 @@ model Engagement {
   rejectedAt   DateTime?
   cancelledAt  DateTime?
   conversation Conversation?
+  reviews      Review[]
 
   @@unique([projectId, freelancerId])
   @@index([clientId, status, createdAt])
@@ -285,4 +289,35 @@ model Report {
 
   @@index([status, createdAt])
   @@index([targetType, targetId])
+}
+
+model Review {
+  id           String     @id @default(cuid())
+  engagementId String
+  engagement   Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User       @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetId     String
+  target       User       @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  rating       Int
+  comment      String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([engagementId, authorId])
+  @@index([targetId, createdAt])
+}
+
+model PortfolioItem {
+  id           String   @id @default(cuid())
+  freelancerId String
+  freelancer   User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  url          String?
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([freelancerId, createdAt])
 }
