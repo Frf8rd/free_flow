@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "seed": "node prisma/seed.js",
     "test": "node --test",
+    "test:matching": "node --test src/services/matching/matching.test.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "admin:create": "node scripts/create-admin.js"
