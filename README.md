@@ -1,88 +1,53 @@
-# FairMatch
+# FairMatch: client (React)
 
-FairMatch este o platformă web pentru potrivirea freelancerilor cu proiecte și clienți.
-Aplicația pune accent pe relevanță, transparență și echitate: utilizatorii pot căuta
-freelanceri, crea proiecte, vedea potriviri explicabile, administra colaborări și
-comunica în cadrul proiectelor.
+Frontend pentru FairMatch, conectat la API-ul din README-ul proiectului. Nicio pagină nu conține date de test: totul trece prin `hooks → services → axios`.
 
-## Funcționalități
+## Pornire
 
-- autentificare pentru clienți și freelanceri;
-- explorarea profilurilor de freelanceri;
-- creare și gestionarea proiectelor;
-- potriviri bazate pe abilități, buget și disponibilitate;
-- scoruri și explicații pentru fiecare recomandare;
-- dashboard, portofoliu, mesaje și colaborări;
-- roluri pentru utilizatori și administratori;
-- interfață disponibilă în română, rusă și engleză;
-- teme light și dark;
-- stări de încărcare, eroare și conținut gol.
-
-## Tehnologii
-
-- React 19;
-- TanStack Start și TanStack Router;
-- TanStack Query;
-- Zustand;
-- Tailwind CSS;
-- Radix UI;
-- Vite;
-- TypeScript;
-- Vitest și Testing Library.
-
-## Structura proiectului
-
-```text
-src/
-├── components/       componente UI și componente reutilizabile
-├── pages/            conținutul paginilor aplicației
-├── routes/           rutele și layout-urile TanStack Router
-├── services/         accesul la date și integrarea API
-├── mocks/            date demonstrative pentru dezvoltare
-├── store/            stări persistente Zustand
-├── hooks/            hook-uri reutilizabile
-├── i18n.tsx          traducerile aplicației
-└── styles.css        stilurile globale și tema
-```
-
-## Pornire locală
-
-Este necesară o versiune actuală de Node.js.
-
-```sh
+```bash
 npm install
-npm run dev
+cp .env.example .env      # setează VITE_API_URL către backend
+npm run dev               # cu backendul real
+npm run dev:mock          # fără backend: server simulat în browser (doar dezvoltare)
+npm test                  # test de fum: toate rutele, pe toate rolurile + fluxul complet
+npm run build
 ```
 
-Aplicația poate fi deschisă apoi la adresa afișată în terminal, în mod obișnuit
-`http://localhost:3000`.
+Conturi în modul simulat (parola `demo1234`): `client@demo.md`, `freelancer@demo.md`, `admin@demo.md` (+ `maria@demo.md`, `alex@demo.md`…). Datele simulate stau în `localStorage` (`fm-mock-db-v1`); ștergerea lui le resetează. Serverul simulat **nu intră în build-ul de producție**.
 
-## Comenzi
+## Cum conectezi backendul
 
-```sh
-npm run dev       # pornește serverul de dezvoltare
-npm run build     # creează build-ul de producție
-npm run preview   # previzualizează build-ul de producție
-npm run lint      # rulează ESLint
-npm run test      # rulează testele o singură dată
-npm run test:watch
-                  # rulează testele în modul watch
+1. Pornește API-ul și setează `VITE_API_URL` în `.env`. Butonul Google redirecționează la `VITE_GOOGLE_AUTH_URL` (implicit `VITE_API_URL/auth/google`).
+2. Citește `API_CONTRACT.md`: ce e nou față de README (forgot/reset password, `POST /uploads`, `exposure`, `role` în `PATCH /users/me`, `onboarded` în `/auth/me`) și formele de răspuns așteptate.
+3. Permite CORS pentru originul frontendului. Pentru refresh token în cookie httpOnly: `VITE_REFRESH_COOKIE=true` și `credentials: true` pe server.
+4. Dacă un răspuns diferă de contract, adaptezi în `src/services/<domeniu>.js`, nu în pagini.
+
+## Structură
+
+```
+src/
+  config.js            variabile de mediu, intervale de polling
+  services/            un fișier per domeniu API (auth, projects, matches, …) + api.js (axios, refresh automat, erori)
+  hooks/queries.js     toate interogările și mutațiile (React Query), cu invalidări
+  store/               authStore (sesiune), themeStore
+  lib/                 validators (Zod), useForm, format (monedă, date), image (comprimare), tokens
+  components/
+    ui/                Kit (carduri, stări, progres…), Fields, Modal, Icon
+    forms/             ImageUpload, SkillSelector
+    match/             carduri de potrivire, scor explicat, invitație, raportare
+    layout/            AppLayout, Sidebar, ProtectedRoute, PublicShell
+  pages/               o pagină per rută
+  mocks/               server simulat (activ doar cu VITE_USE_MOCK=true)
 ```
 
-## API și date demonstrative
+## Decizii de produs implementate
 
-Accesul aplicației la date se realizează prin `src/services/*`. În prezent,
-`USE_MOCKS` este activ în `src/services/config.ts`, iar datele demonstrative sunt
-preluate din `src/mocks`.
+- **Rolul se alege la înregistrare** (client / freelancer) și se schimbă **doar din Setări**. Nu există comutator în bara laterală.
+- **Acasă** arată ce ai de făcut acum (nu un feed social): următorul pas, potriviri, atenție, completarea profilului, treapta, expunerea.
+- **Brief-first:** descrierea scrisă pe pagina principală se păstrează și apare precompletată în formularul de proiect după înregistrare.
+- **Echitate vizibilă:** fără sortare după popularitate în Explorează, „Talent în creștere" marcat clar, scorul poate fi deschis componentă cu componentă.
+- Upload de imagini cu validare și comprimare în browser; profil avansat (abilități din catalog, portofoliu, completare măsurată).
 
-Pentru conectarea unui backend real, setează `VITE_API_URL` și dezactivează
-`USE_MOCKS` în fișierul de configurare a serviciilor. Componentele nu au nevoie
-de modificări deoarece păstrează aceeași interfață de servicii.
+## Ce nu e inclus (post-MVP, ca în README)
 
-## Configurare
-
-Variabilele de mediu pot fi definite într-un fișier `.env.local`:
-
-```dotenv
-VITE_API_URL=https://api.example.com
-```
+Plăți/escrow, vouch-uri, editarea/ștergerea recenziilor, notificări pe email (le trimite backendul), traducere interfață (textele sunt în română), pre-randare SEO pentru paginile publice (SPA Vite), analytics (există punctul de conectare `lib/analytics.js`).
