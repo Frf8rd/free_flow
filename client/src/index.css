@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-family: 'Inter', system-ui, sans-serif; }
+  body { @apply text-fm-slate antialiased; background-color: rgb(var(--fm-page)); }
+}
+
+
+@layer utilities {
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+/* scrollbar subțire pentru zona principală */
+.thin-scroll { scroll-behavior: smooth; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgb(95 98 102 / .35) transparent; }
+.thin-scroll::-webkit-scrollbar { width: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgb(95 98 102 / .3); border-radius: 8px; }
+
+/* Suprafețe și controale cu muchii drepte; avatarurile și indicatorii rotunzi rămân neschimbate. */
+.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 0 !important; }
+
+/* ---------- Teme: deschisă / întunecată (variabile ca „R G B”, pentru modificatori de opacitate) ----------
+   Straturi în tema întunecată (de la cel mai închis la cel mai deschis):
+   panouri întunecate/sidebar < page (fundal) < card < snow (casete în carduri) < mist (accente, bare) */
+:root {
+  --fm-page: 248 249 250; --fm-snow: 248 249 250; --fm-mist: 207 209 212; --fm-steel: 165 169 174; --fm-graphite: 95 98 102;
+  --fm-ink: 24 27 30; --fm-slate: 24 27 30; --fm-card: 255 255 255; --fm-frame1: 233 235 238; --fm-frame2: 214 217 221;
+  --fm-panel: 24 27 30;
+  color-scheme: light;
+}
+.dark {
+  --fm-page: 11 13 18; --fm-snow: 35 40 51; --fm-mist: 54 60 76; --fm-steel: 122 131 153; --fm-graphite: 134 156 238;
+  --fm-ink: 236 239 245; --fm-slate: 236 239 245; --fm-card: 27 31 40; --fm-frame1: 6 7 10; --fm-frame2: 11 13 19;
+  --fm-panel: 9 12 21;
+  color-scheme: dark;
+}
+/* Zone care rămân întunecate în ambele teme (sidebar, panouri): primesc valorile temei deschise */
+.fm-dark {
+  --fm-snow: 248 249 250; --fm-mist: 207 209 212; --fm-steel: 165 169 174; --fm-graphite: 95 98 102;
+  --fm-ink: 24 27 30; --fm-slate: 24 27 30; --fm-card: 255 255 255;
+}
+.dark .fm-dark { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); }
+.dark .fm-dark.bg-fm-ink { background-color: rgb(var(--fm-panel)); }
+/* Meniurile care se deschid din zone întunecate revin la tema curentă */
+.dark .fm-restore {
+  --fm-snow: 35 40 51; --fm-mist: 54 60 76; --fm-steel: 122 131 153; --fm-graphite: 134 156 238;
+  --fm-ink: 236 239 245; --fm-slate: 236 239 245; --fm-card: 27 31 40;
+}
+.bg-fm-page { background-color: rgb(var(--fm-page) / var(--tw-bg-opacity, 1)); }
+.bg-white { background-color: rgb(var(--fm-card) / var(--tw-bg-opacity, 1)); }
+.hover\:bg-white:hover { background-color: rgb(var(--fm-card) / var(--tw-bg-opacity, 1)); }
+.fm-frame { background: linear-gradient(135deg, rgb(var(--fm-frame1)), rgb(var(--fm-frame2))); }
+/* Carduri puțin ridicate în tema întunecată, ca să se vadă straturile */
+.dark .shadow-card { box-shadow: 0 1px 0 rgb(255 255 255 / .04) inset, 0 8px 24px -12px rgb(0 0 0 / .6); }
+/* În tema întunecată, elementele „primare” (bg-fm-ink) devin deschise: textul lor trebuie să fie închis */
+.dark .bg-fm-ink:not(.fm-dark), .dark .bg-fm-graphite, .dark [class*="from-fm-"] { color: rgb(var(--fm-card)); }
+.dark input::placeholder, .dark textarea::placeholder { opacity: .6; }
+/* Chrome aplică un fundal albastru propriu câmpurilor completate automat; păstrăm tema aplicației. */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus,
+textarea:-webkit-autofill, textarea:-webkit-autofill:hover, textarea:-webkit-autofill:focus,
+select:-webkit-autofill, select:-webkit-autofill:hover, select:-webkit-autofill:focus {
+  -webkit-text-fill-color: rgb(var(--fm-ink));
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--fm-card)) inset;
+  box-shadow: 0 0 0 1000px rgb(var(--fm-card)) inset;
+  caret-color: rgb(var(--fm-ink));
+}
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; animation-duration: 0s !important; } }
