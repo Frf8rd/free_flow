@@ -22,6 +22,7 @@ export default function Register() {
   const [terms, setTerms] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
+  const [serverCode, setServerCode] = useState('');
   const [loading, setLoading] = useState(false);
   const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setErrors({ ...errors, [k]: '' }); };
   const s = strength(form.password);
@@ -43,6 +44,7 @@ export default function Register() {
   async function onSubmit(ev) {
     ev.preventDefault();
     setServerError('');
+    setServerCode('');
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -51,7 +53,15 @@ export default function Register() {
       await register(form);
       go();
     } catch (err) {
-      setServerError(err.message);
+      const messages = {
+        EMAIL_IN_USE: 'Există deja un cont cu acest email.',
+        ACCOUNT_ALREADY_EXISTS: 'Există deja un cont cu acest email.',
+        ACCOUNT_LINK_REQUIRED: 'Există deja un cont cu acest email.',
+      };
+      setServerCode(err.code || (err.status === 409 ? 'EMAIL_IN_USE' : ''));
+      setServerError(err.status === 429
+        ? 'Prea multe încercări. Așteaptă câteva minute și încearcă din nou.'
+        : messages[err.code] || (err.status === 409 ? messages.EMAIL_IN_USE : err.message));
     } finally {
       setLoading(false);
     }
@@ -87,6 +97,9 @@ export default function Register() {
         {serverError && (
           <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
             {serverError}
+            {(serverCode === 'EMAIL_IN_USE' || serverCode === 'ACCOUNT_ALREADY_EXISTS' || serverCode === 'ACCOUNT_LINK_REQUIRED') && (
+              <> <Link to="/login" className="font-semibold underline">Autentifică-te</Link> sau folosește „Continuă cu Google” dacă ai creat contul așa.</>
+            )}
           </div>)}
         <Button type="submit" loading={loading} className="w-full rounded-md">Creează cont</Button>
       </form>

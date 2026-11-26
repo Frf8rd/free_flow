@@ -13,6 +13,12 @@ const loginLimiter = rateLimit({
   name: "auth-attempt",
   max: process.env.NODE_ENV === "production" ? 10 : 100,
 });
+// Butonul Google cere o provocare la fiecare încărcare a paginii; nu trebuie să consume
+// limita strictă de login/înregistrare (altfel câteva refresh-uri blochează formularul).
+const oauthChallengeLimiter = rateLimit({
+  name: "auth-oauth-challenge",
+  max: process.env.NODE_ENV === "production" ? 60 : 300,
+});
 const refreshLimiter = rateLimit({ name: "auth-refresh", max: 60 });
 const sensitiveActionLimiter = rateLimit({
   name: "auth-sensitive-action",
@@ -65,7 +71,7 @@ router.post("/login", loginLimiter, async (req, res) => {
   respondWithSession(res, await authService.login(req.body));
 });
 
-router.post("/oauth/google/challenge", loginLimiter, async (req, res) => {
+router.post("/oauth/google/challenge", oauthChallengeLimiter, async (req, res) => {
   res.json(await authService.createOAuthChallenge("google"));
 });
 
