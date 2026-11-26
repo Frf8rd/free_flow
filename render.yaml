@@ -12,6 +12,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
@@ -19,6 +21,8 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
+        sync: false
+      - key: RESEND_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false

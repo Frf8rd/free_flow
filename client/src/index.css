@@ -26,13 +26,13 @@
 :root {
   --fm-page: 248 249 250; --fm-snow: 248 249 250; --fm-mist: 207 209 212; --fm-steel: 165 169 174; --fm-graphite: 95 98 102;
   --fm-ink: 24 27 30; --fm-slate: 24 27 30; --fm-card: 255 255 255; --fm-frame1: 233 235 238; --fm-frame2: 214 217 221;
-  --fm-panel: 24 27 30;
+  --fm-panel: 24 27 30; --fm-accent: 79 70 229; --fm-accent-solid: 79 70 229;
   color-scheme: light;
 }
 .dark {
   --fm-page: 11 13 18; --fm-snow: 35 40 51; --fm-mist: 54 60 76; --fm-steel: 122 131 153; --fm-graphite: 134 156 238;
   --fm-ink: 236 239 245; --fm-slate: 236 239 245; --fm-card: 27 31 40; --fm-frame1: 6 7 10; --fm-frame2: 11 13 19;
-  --fm-panel: 9 12 21;
+  --fm-panel: 9 12 21; --fm-accent: 165 180 252; --fm-accent-solid: 99 102 241;
   color-scheme: dark;
 }
 /* Zone care rămân întunecate în ambele teme (sidebar, panouri): primesc valorile temei deschise */

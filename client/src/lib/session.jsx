@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { me } from '../data/mock.js';
 import { useAuth } from '../store/authStore.js';
 
 // Un singur cont pentru toți: același utilizator poate posta proiecte (mod CLIENT) și poate lucra ca FREELANCER.
@@ -18,9 +17,7 @@ export function SessionProvider({ children }) {
   });
   const [theme, setThemeState] = useState(() => read('fm-theme', 'system'));
   const [system, setSystem] = useState(sysDark);
-  const [userDetails, setUserDetails] = useState(() => {
-    try { return JSON.parse(read('fm-user-details', '{}')) || {}; } catch { return {}; }
-  });
+  const [userDetails, setUserDetails] = useState({});
 
   useEffect(() => {
     const mq = matchMedia('(prefers-color-scheme: dark)');
@@ -33,6 +30,19 @@ export function SessionProvider({ children }) {
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
 
   useEffect(() => { useAuth.getState().bootstrap(); }, []);
+
+  useEffect(() => {
+    if (!authUser?.id) {
+      setUserDetails({});
+      try { localStorage.removeItem('fm-user-details'); } catch { /* ignoră */ }
+      return;
+    }
+    try {
+      setUserDetails(JSON.parse(localStorage.getItem(`fm-user-details:${authUser.id}`) || '{}') || {});
+    } catch {
+      setUserDetails({});
+    }
+  }, [authUser?.id]);
 
   const mode = authUser?.role === 'CLIENT' || authUser?.role === 'FREELANCER' ? authUser.role : modeOverride;
   const setMode = useCallback(async (m) => {
@@ -56,17 +66,16 @@ export function SessionProvider({ children }) {
   const updateUser = useCallback((changes) => {
     setUserDetails((current) => {
       const next = { ...current, ...changes };
-      write('fm-user-details', JSON.stringify(next));
+      if (authUser?.id) write(`fm-user-details:${authUser.id}`, JSON.stringify(next));
       return next;
     });
-  }, []);
-  // test: localStorage.setItem('fm-admin','1') + reload arată secțiunea Administrare
+  }, [authUser?.id]);
   const user = useMemo(() => {
-    const base = authUser || me;
-    const name = userDetails.name || base.name || me.name;
+    const base = authUser || { name: 'Vizitator', role: modeOverride, avatarUrl: null };
+    const name = authUser ? (userDetails.name || base.name) : base.name;
     const initials = userDetails.initials || name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
     return { ...base, ...userDetails, name, initials, avatar: userDetails.avatar || base.avatarUrl || base.avatar, isAdmin: base.role === 'ADMIN' };
-  }, [authUser, userDetails]);
+  }, [authUser, userDetails, modeOverride]);
 
   const value = useMemo(() => ({ user, updateUser, mode, setMode, previousMode, theme, setTheme, dark }), [user, updateUser, mode, setMode, previousMode, theme, setTheme, dark]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

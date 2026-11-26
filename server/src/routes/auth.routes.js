@@ -117,7 +117,7 @@ router.post("/reset-password", passwordResetLimiter, async (req, res) => {
 });
 
 router.post("/logout", authenticate, async (req, res) => {
-  await authService.logout(req.user.id);
+  await authService.logout(req.user.id, getRefreshToken(req));
   clearRefreshCookie(res);
   res.status(204).end();
 });

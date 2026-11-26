@@ -8,7 +8,7 @@ export default {
     extend: {
       fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
       // Culorile vin din variabile CSS (vezi index.css), ca tema întunecată să funcționeze peste tot
-      colors: { fm: { page: v('page'), snow: v('snow'), mist: v('mist'), steel: v('steel'), graphite: v('graphite'), ink: v('ink'), slate: v('slate') } },
+      colors: { fm: { page: v('page'), snow: v('snow'), mist: v('mist'), steel: v('steel'), graphite: v('graphite'), ink: v('ink'), slate: v('slate'), accent: v('accent'), 'accent-solid': v('accent-solid') } },
       boxShadow: { card: '0 1px 2px rgba(24,27,30,.04)' },
     },
   },

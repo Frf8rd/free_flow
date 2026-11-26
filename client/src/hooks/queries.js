@@ -80,7 +80,12 @@ export const useAiDisclosure = () => useInvalidating(({ id, usedAi }) => engagem
 export const useReview = () => useInvalidating(({ id, ...body }) => engagements.review(id, body), [['engagement'], ['freelancer'], ['freelancer-reviews']]);
 
 /* ---------- chat ---------- */
-export const useConversations = (enabled = true) => useQuery({ queryKey: ['conversations'], queryFn: conversations.list, enabled, refetchInterval: enabled ? config.pollChatMs * 3 : false });
+export const useConversations = (enabled = true) => useQuery({
+  queryKey: ['conversations'],
+  queryFn: conversations.list,
+  enabled,
+  refetchInterval: (query) => enabled && document.visibilityState === 'visible' ? Math.max(config.pollChatMs * 6, 30_000) : false,
+});
 export const useMessages = (id) => useQuery({ queryKey: ['messages', id], queryFn: () => conversations.messages(id, { limit: 100 }), enabled: !!id, refetchInterval: config.pollChatMs });
 export const useSendMessage = (id) => {
   const qc = useQueryClient();
@@ -137,7 +142,12 @@ export const useUpdateAccount = () => useMutation({ mutationFn: auth.updateAccou
 export const useChangePassword = () => useMutation({ mutationFn: auth.changePassword });
 export const useDeleteAccount = () => {
   const mutation = useMutation({ mutationFn: users.deleteMe });
-  return { ...mutation, deleteAccount: async (password) => { await mutation.mutateAsync({ password }); useAuth.getState().clear(); } };
+  return { ...mutation, deleteAccount: async (proof) => {
+    await mutation.mutateAsync(proof);
+    const userId = useAuth.getState().user?.id;
+    try { if (userId) localStorage.removeItem(`fm-user-details:${userId}`); } catch { /* ignoră */ }
+    useAuth.getState().clear();
+  } };
 };
 
 /* ---------- admin ---------- */

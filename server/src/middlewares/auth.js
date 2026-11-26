@@ -42,4 +42,25 @@ async function authenticate(req, res, next) {
   }
 }
 
-module.exports = { authenticate };
+async function authenticateOptional(req, _res, next) {
+  const authorization = req.get("authorization") || "";
+  const match = authorization.match(/^Bearer ([^\s]+)$/i);
+  if (!match) { req.user = null; return next(); }
+
+  try {
+    const claims = verifyAccessToken(match[1]);
+    if (!claims) { req.user = null; return next(); }
+    const user = await prisma.user.findUnique({
+      where: { id: claims.userId },
+      select: { id: true, email: true, name: true, role: true, avatarUrl: true, dashboardBackgroundUrl: true, isBlocked: true, tokenVersion: true },
+    });
+    if (!user || user.isBlocked || claims.tokenVersion !== user.tokenVersion) { req.user = null; return next(); }
+    if (user.role === "ADMIN" && !(await isAdminAllowlisted(user.email))) { req.user = null; return next(); }
+    req.user = user;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { authenticate, authenticateOptional };

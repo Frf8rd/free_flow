@@ -7,7 +7,7 @@ const optionalInt = z.preprocess((v) => (v === '' || v == null ? undefined : Num
 
 export const loginSchema = z.object({ email, password: z.string().min(1, 'Introdu parola.') });
 
-export const passwordRule = z.string().min(8, 'Minim 8 caractere.').max(72, 'Maxim 72 de caractere.');
+export const passwordRule = z.string().min(12, 'Minim 12 caractere.').max(72, 'Maxim 72 de caractere.');
 export const registerSchema = z.object({
   role: z.enum(['CLIENT', 'FREELANCER'], { errorMap: () => ({ message: 'Alege cum vei folosi FairMatch.' }) }),
   name: z.string().trim().min(2, 'Introdu numele tău.').max(80),

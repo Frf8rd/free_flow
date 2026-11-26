@@ -85,6 +85,10 @@ export function SkeletonList({ n = 3 }) {
   return <div className="grid gap-3" aria-label="Se încarcă" aria-busy="true">{Array.from({ length: n }, (_, i) => <div key={i} className="animate-pulse border border-fm-ink/10 bg-white p-5"><div className="h-4 w-2/5 bg-fm-mist" /><div className="mt-3 h-3 w-4/5 bg-fm-mist/70" /><div className="mt-2 h-3 w-3/5 bg-fm-mist/70" /></div>)}</div>;
 }
 
+export function Skeleton({ className = "" }) {
+  return <div aria-hidden="true" className={`animate-pulse bg-fm-mist/70 ${className}`} />;
+}
+
 export function Async({ q, skeleton, children }) {
   if (q.isPending) return skeleton || <SkeletonList n={2} />;
   if (q.isError) return <Card><Empty icon="alert" title="Datele nu s-au încărcat" text={q.error?.message || 'Încearcă din nou.'} action={<button onClick={() => q.refetch?.()} className="border border-fm-graphite/25 px-4 py-2 text-sm font-semibold text-fm-ink">Reîncarcă</button>} /></Card>;

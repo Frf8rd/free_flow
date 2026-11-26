@@ -26,7 +26,7 @@ export default function ResetPassword() {
       ) : (
         <form onSubmit={onSubmit} noValidate className="mt-7 space-y-4 text-left">
           {f.formError && <Notice tone="danger" icon="alert">{f.formError}</Notice>}
-          <Field label="Parolă nouă" hint="Minim 8 caractere." error={f.errors.password}><Text type="password" autoComplete="new-password" error={f.errors.password} {...f.bind('password')} /></Field>
+          <Field label="Parolă nouă" hint="Minim 12 caractere." error={f.errors.password}><Text type="password" autoComplete="new-password" error={f.errors.password} {...f.bind('password')} /></Field>
           <Field label="Repetă parola" error={f.errors.confirm}><Text type="password" autoComplete="new-password" error={f.errors.confirm} {...f.bind('confirm')} /></Field>
           <Button type="submit" loading={f.submitting} className="w-full">Salvează parola</Button>
         </form>

@@ -52,7 +52,17 @@ async function searchFreelancers(query = {}, { db = prisma } = {}) {
   const profile = { onboarded: true };
   const where = { role: "FREELANCER", isBlocked: false, freelancerProfile: profile };
   const search = parseSearch(query.q);
-  if (search) where.name = { contains: search, mode: "insensitive" };
+  if (search) {
+    where.AND = [
+      { OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { freelancerProfile: { is: { title: { contains: search, mode: "insensitive" } } } },
+        { freelancerProfile: { is: { skills: { some: { skill: { name: { contains: search, mode: "insensitive" } } } } } } },
+      ] },
+      { freelancerProfile: profile },
+    ];
+    delete where.freelancerProfile;
+  }
   const profileConditions = [];
   if (query.categoryId !== undefined) {
     if (typeof query.categoryId !== "string" || !query.categoryId.trim()) throw new AppError(400, "VALIDATION_ERROR", "Categoria invalidă.");

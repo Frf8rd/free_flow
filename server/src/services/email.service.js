@@ -28,21 +28,46 @@ function getSmtpConfig() {
     port,
     secure: secure === "true",
     from,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     ...(user ? { auth: { user, pass: password } } : {}),
   };
 }
 
-async function sendEmail({ to, subject, text }) {
-  const config = getSmtpConfig();
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    ...(config.auth ? { auth: config.auth } : {}),
-  });
+function getEmailConfig() {
+  const from = (process.env.EMAIL_FROM || "").trim();
+  const resendApiKey = (process.env.RESEND_API_KEY || "").trim();
+  if (resendApiKey) {
+    if (!from) throw new AppError(503, "EMAIL_NOT_CONFIGURED", "EMAIL_FROM trebuie configurat pentru trimiterea emailurilor.");
+    return { provider: "resend", apiKey: resendApiKey, from };
+  }
+  return { provider: "smtp", ...getSmtpConfig() };
+}
 
+async function sendEmail({ to, subject, text }) {
+  const config = getEmailConfig();
   try {
-    await transporter.sendMail({ from: config.from, to, subject, text });
+    if (config.provider === "resend") {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: config.from, to: [to], subject, text }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        console.error("Email API delivery failed.", { status: response.status });
+        throw new Error("Email provider rejected the request.");
+      }
+      return;
+    }
+    const transporter = nodemailer.createTransport({
+      host: config.host, port: config.port, secure: config.secure,
+      connectionTimeout: config.connectionTimeout, greetingTimeout: config.greetingTimeout, socketTimeout: config.socketTimeout,
+      ...(config.auth ? { auth: config.auth } : {}),
+    });
+    try { await transporter.sendMail({ from: config.from, to, subject, text }); }
+    finally { transporter.close(); }
   } catch (error) {
     console.error("Email delivery failed.", {
       code: error && typeof error.code === "string" ? error.code : "UNKNOWN",
@@ -51,4 +76,4 @@ async function sendEmail({ to, subject, text }) {
   }
 }
 
-module.exports = { getSmtpConfig, sendEmail };
+module.exports = { getSmtpConfig, getEmailConfig, sendEmail };

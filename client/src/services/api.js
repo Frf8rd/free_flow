@@ -8,12 +8,12 @@ const api = axios.create({
   headers: { Accept: 'application/json' },
 });
 
-if (config.useMock && import.meta.env.DEV) {
-  const { installMock } = await import('../mocks/index.js');
-  installMock(api);
-}
+const mockReady = config.useMock && import.meta.env.DEV
+  ? import('../mocks/index.js').then(({ installMock }) => installMock(api))
+  : Promise.resolve();
 
-api.interceptors.request.use((request) => {
+api.interceptors.request.use(async (request) => {
+  await mockReady;
   const token = tokens.getAccess();
   if (token) request.headers.Authorization = `Bearer ${token}`;
   return request;
@@ -22,7 +22,7 @@ api.interceptors.request.use((request) => {
 let refreshPromise;
 export async function refreshSession() {
   if (!refreshPromise) {
-    refreshPromise = api.post('/auth/refresh', config.refreshCookie ? undefined : { refreshToken: tokens.getRefresh() }, { _skipAuthRefresh: true })
+    const rotate = () => api.post('/auth/refresh', config.refreshCookie ? undefined : { refreshToken: tokens.getRefresh() }, { _skipAuthRefresh: true })
       .then(({ data }) => {
         const session = data?.data || data;
         if (!session?.accessToken) throw new Error('Sesiunea nu a putut fi reînnoită.');
@@ -32,6 +32,9 @@ export async function refreshSession() {
         return session;
       })
       .finally(() => { refreshPromise = undefined; });
+    refreshPromise = typeof navigator !== 'undefined' && navigator.locks?.request
+      ? navigator.locks.request('fairmatch-refresh-token', { mode: 'exclusive' }, rotate)
+      : rotate();
   }
   return refreshPromise;
 }

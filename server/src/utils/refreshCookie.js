@@ -12,7 +12,8 @@ function getRefreshToken(req) {
       return null;
     }
   }
-  return null;
+  const bodyToken = req.body && req.body.refreshToken;
+  return typeof bodyToken === "string" ? bodyToken : null;
 }
 
 function setRefreshCookie(res, token) {

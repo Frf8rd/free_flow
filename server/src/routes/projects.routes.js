@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { authenticate } = require("../middlewares/auth");
+const { authenticate, authenticateOptional } = require("../middlewares/auth");
 const { requireRole } = require("../middlewares/requireRole");
 const { rateLimit } = require("../middlewares/rateLimit");
 const projectsController = require("../controllers/projects.controller");
@@ -13,19 +13,18 @@ const projectMutationLimiter = rateLimit({
   max: 30,
 });
 
-router.use(authenticate);
-router.post("/", requireRole("CLIENT"), projectMutationLimiter, projectsController.create);
 router.get("/", projectsController.list);
-router.get("/me", requireRole("CLIENT"), projectsController.listMine);
-router.get("/:id/matches", requireRole("CLIENT"), projectsController.matches);
-router.patch("/:id", requireRole("CLIENT"), projectMutationLimiter, projectsController.update);
-router.patch("/:id/close", requireRole("CLIENT"), projectMutationLimiter, projectsController.close);
-router.patch("/:id/reopen", requireRole("CLIENT"), projectMutationLimiter, projectsController.reopen);
-router.delete("/:id", requireRole("CLIENT"), projectMutationLimiter, projectsController.remove);
-router.get("/:id", projectsController.getById);
-router.get("/:id/attachments", attachmentsController.list);
-router.get("/:id/attachments/:attachmentId/file", attachmentsController.file);
-router.post("/:id/attachments", requireRole("CLIENT"), projectMutationLimiter, uploadProjectImage, attachmentsController.upload);
-router.delete("/:id/attachments/:attachmentId", requireRole("CLIENT"), projectMutationLimiter, attachmentsController.remove);
+router.get("/me", authenticate, requireRole("CLIENT"), projectsController.listMine);
+router.get("/:id/matches", authenticate, requireRole("CLIENT"), projectsController.matches);
+router.get("/:id/attachments", authenticate, attachmentsController.list);
+router.get("/:id/attachments/:attachmentId/file", authenticate, attachmentsController.file);
+router.post("/", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.create);
+router.patch("/:id", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.update);
+router.patch("/:id/close", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.close);
+router.patch("/:id/reopen", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.reopen);
+router.delete("/:id", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.remove);
+router.post("/:id/attachments", authenticate, requireRole("CLIENT"), projectMutationLimiter, uploadProjectImage, attachmentsController.upload);
+router.delete("/:id/attachments/:attachmentId", authenticate, requireRole("CLIENT"), projectMutationLimiter, attachmentsController.remove);
+router.get("/:id", authenticateOptional, projectsController.getById);
 
 module.exports = router;

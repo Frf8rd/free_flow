@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ProtectedRoute, { GuestRoute } from './components/layout/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -28,6 +28,17 @@ const Contact = lazy(load('Contact'));
 const ForgotPassword = lazy(load('ForgotPassword'));
 const ResetPassword = lazy(load('ResetPassword'));
 const HowItWorks = lazy(load('HowItWorks'));
+const EmailVerification = lazy(load('EmailVerification'));
+
+function HomeRoute() {
+  const { hash } = useLocation();
+  const action = new URLSearchParams(hash.replace(/^#/, ''));
+  const verificationToken = action.get('verifyEmailToken');
+  const resetToken = action.get('resetPasswordToken');
+  if (verificationToken) return <Navigate to={`/verify-email?token=${encodeURIComponent(verificationToken)}`} replace />;
+  if (resetToken) return <Navigate to={`/reset-password?token=${encodeURIComponent(resetToken)}`} replace />;
+  return <Landing />;
+}
 
 export default function App() {
   const authed = useAuth((s) => s.status === 'authed');
@@ -35,7 +46,7 @@ export default function App() {
   return (
     <Suspense fallback={<main className="grid min-h-screen place-items-center bg-fm-page p-6"><p role="status" className="text-sm text-fm-slate/70">Se încarcă pagina…</p></main>}>
     <Routes>
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<HomeRoute />} />
       <Route path="/browse" element={<Browse />} />
       <Route path="/freelancers/:id" element={<FreelancerProfile />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
@@ -45,6 +56,7 @@ export default function App() {
       <Route path="/contact" element={<Contact />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<EmailVerification />} />
 
       <Route element={<GuestRoute />}>
         <Route path="/login" element={<Login />} />

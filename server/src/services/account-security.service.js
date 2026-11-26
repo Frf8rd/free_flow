@@ -27,13 +27,15 @@ function getFrontendUrl() {
 }
 
 function assertEmailReady() {
-  emailService.getSmtpConfig();
+  emailService.getEmailConfig();
   getFrontendUrl();
 }
 
 function buildActionUrl(parameter, token) {
   const url = getFrontendUrl();
-  url.hash = new URLSearchParams({ [parameter]: token }).toString();
+  url.pathname = parameter === "verifyEmailToken" ? "/verify-email" : "/reset-password";
+  url.searchParams.set("token", token);
+  url.hash = "";
   return url.toString();
 }
 

@@ -99,6 +99,9 @@ async function createProject(clientId, input, db = prisma) {
       throw new AppError(400, "VALIDATION_ERROR", "Termenul proiectului nu este o dată validă.");
     }
     deadline = new Date(input.deadline);
+    if (input.deadline.slice(0, 10) < new Date().toISOString().slice(0, 10)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Termenul proiectului nu poate fi în trecut.");
+    }
   }
 
   const skillIds = parseSkillIds(input.skillIds);
@@ -120,8 +123,9 @@ async function createProject(clientId, input, db = prisma) {
     }
   }
 
-  const project = await db.project.create({
-    data: {
+  const create = async (tx) => {
+    const project = await tx.project.create({
+      data: {
       clientId,
       title,
       description,
@@ -132,11 +136,14 @@ async function createProject(clientId, input, db = prisma) {
       ...(skillIds.length
         ? { skills: { create: skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } })) } }
         : {}),
-    },
-    include: projectInclude,
-  });
-  if (db === prisma) await enqueueMatchingJob("PROJECT", project.id, db);
-  return project;
+      },
+      include: projectInclude,
+    });
+    if (db === prisma) await enqueueMatchingJob("PROJECT", project.id, tx);
+    return project;
+  };
+  const project = db === prisma ? await db.$transaction(create) : await create(db);
+  return withImageUrls(project);
 }
 
 function validateProjectInput(input) {
@@ -184,8 +191,8 @@ async function updateProject(projectId, clientId, input, db = prisma) {
   }
 
   const project = await findOwnedProject(projectId, clientId, db);
-  if (project.status === "CLOSED") {
-    throw new AppError(409, "PROJECT_CLOSED", "Un proiect închis nu mai poate fi modificat.");
+  if (project.status !== "OPEN") {
+    throw new AppError(409, "PROJECT_NOT_EDITABLE", "Poți modifica doar proiectele deschise.");
   }
 
   const data = {};
@@ -234,6 +241,9 @@ async function updateProject(projectId, clientId, input, db = prisma) {
       throw new AppError(400, "VALIDATION_ERROR", "Termenul proiectului nu este o dată validă.");
     } else {
       data.deadline = new Date(input.deadline);
+      if (input.deadline.slice(0, 10) < new Date().toISOString().slice(0, 10)) {
+        throw new AppError(400, "VALIDATION_ERROR", "Termenul proiectului nu poate fi în trecut.");
+      }
     }
   }
 
@@ -259,23 +269,28 @@ async function updateProject(projectId, clientId, input, db = prisma) {
     data.skills = { deleteMany: {} };
   }
 
-  const updated = await db.project.update({
-    where: { id: project.id },
-    data,
-    include: projectInclude,
-  });
-  if (db === prisma && project.status === "OPEN") await enqueueMatchingJob("PROJECT", updated.id, db);
-  return updated;
+  const update = async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: project.id },
+      data,
+      include: projectInclude,
+    });
+    if (db === prisma && project.status === "OPEN") await enqueueMatchingJob("PROJECT", updated.id, tx);
+    return updated;
+  };
+  const updated = db === prisma ? await db.$transaction(update) : await update(db);
+  return withImageUrls(updated);
 }
 
 async function closeProject(projectId, clientId, db = prisma) {
   const project = await findOwnedProject(projectId, clientId, db);
-  if (project.status === "CLOSED") return getProject(project.id, db);
+  if (project.status === "CLOSED") return getProject(project.id, db, { id: clientId });
+  if (project.status !== "OPEN") throw new AppError(409, "PROJECT_NOT_CLOSABLE", "Un proiect aflat în lucru sau finalizat nu poate fi închis.");
   return db.project.update({
     where: { id: project.id },
     data: { status: "CLOSED" },
     include: projectInclude,
-  });
+  }).then(withImageUrls);
 }
 
 async function reopenProject(projectId, clientId, db = prisma) {
@@ -283,17 +298,29 @@ async function reopenProject(projectId, clientId, db = prisma) {
   if (project.status !== "CLOSED") {
     throw new AppError(409, "PROJECT_NOT_CLOSED", "Doar proiectele închise pot fi redeschise.");
   }
-  const reopened = await db.project.update({
-    where: { id: project.id },
-    data: { status: "OPEN" },
-    include: projectInclude,
-  });
-  if (db === prisma) await enqueueMatchingJob("PROJECT", reopened.id, db);
-  return reopened;
+  const reopen = async (tx) => {
+    const reopened = await tx.project.update({
+      where: { id: project.id },
+      data: { status: "OPEN" },
+      include: projectInclude,
+    });
+    if (db === prisma) await enqueueMatchingJob("PROJECT", reopened.id, tx);
+    return reopened;
+  };
+  const reopened = db === prisma ? await db.$transaction(reopen) : await reopen(db);
+  return withImageUrls(reopened);
 }
 
 async function deleteProject(projectId, clientId, db = prisma) {
   const project = await findOwnedProject(projectId, clientId, db);
+  if (project.status === "IN_PROGRESS" || project.status === "COMPLETED") {
+    throw new AppError(409, "PROJECT_HAS_HISTORY", "Un proiect aflat în lucru sau finalizat nu poate fi șters.");
+  }
+  const [engagement, conversation] = await Promise.all([
+    db.engagement.findFirst({ where: { projectId: project.id }, select: { id: true } }),
+    db.conversation.findFirst({ where: { projectId: project.id }, select: { id: true } }),
+  ]);
+  if (engagement || conversation) throw new AppError(409, "PROJECT_HAS_HISTORY", "Proiectul are colaborări sau conversații asociate; închide-l în loc să-l ștergi.");
   const attachments = db.projectAttachment
     ? await db.projectAttachment.findMany({ where: { projectId: project.id }, select: { storageKey: true } })
     : [];
@@ -314,7 +341,8 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
     if (!PROJECT_STATUSES.has(query.status)) {
       throw new AppError(400, "VALIDATION_ERROR", "Starea proiectului nu este validă.");
     }
-    where.status = query.status;
+    if (clientId) where.status = query.status;
+    else if (query.status !== "OPEN") throw new AppError(403, "FORBIDDEN", "Poți lista doar proiectele deschise.");
   }
   if (query.categoryId !== undefined) {
     if (typeof query.categoryId !== "string" || !query.categoryId.trim()) {
@@ -343,8 +371,12 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
   if (minBudget !== null && maxBudget !== null && minBudget > maxBudget) {
     throw new AppError(400, "VALIDATION_ERROR", "Bugetul minim nu poate depăși bugetul maxim.");
   }
-  if (minBudget !== null) where.budgetMax = { gte: minBudget };
-  if (maxBudget !== null) where.budgetMin = { lte: maxBudget };
+  if (minBudget !== null) {
+    where.AND = [...(where.AND || []), { OR: [{ budgetMax: { gte: minBudget } }, { budgetMax: null }] }];
+  }
+  if (maxBudget !== null) {
+    where.AND = [...(where.AND || []), { OR: [{ budgetMin: { lte: maxBudget } }, { budgetMin: null }] }];
+  }
 
   const [total, data] = await Promise.all([
     db.project.count({ where }),
@@ -365,7 +397,7 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
   return { data: data.map(({ _count, ...project }) => ({ ...withImageUrls(project), matchesCount: _count?.matches ?? 0, interestedCount: interestedByProject.get(project.id) ?? 0 })), page, limit, total };
 }
 
-async function getProject(id, db = prisma) {
+async function getProject(id, db = prisma, viewer = null) {
   if (typeof id !== "string" || !id.trim()) {
     throw new AppError(400, "VALIDATION_ERROR", "Identificatorul proiectului nu este valid.");
   }
@@ -374,6 +406,14 @@ async function getProject(id, db = prisma) {
     include: projectInclude,
   });
   if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  if (project.status !== "OPEN" && project.clientId !== viewer?.id) {
+    if (!viewer?.id) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+    const participant = await db.engagement.findFirst({
+      where: { projectId: project.id, status: { in: ["IN_PROGRESS", "DELIVERED", "COMPLETED"] }, OR: [{ clientId: viewer.id }, { freelancerId: viewer.id }] },
+      select: { id: true },
+    });
+    if (!participant) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  }
   return withImageUrls(project);
 }
 

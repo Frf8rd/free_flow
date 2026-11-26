@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import PageShell from '../components/layout/PageShell.jsx';
+import { GoogleReauthButton } from '../components/layout/AuthShell.jsx';
 import Button from '../components/ui/Button.jsx';
 import Icon from '../components/ui/Icon.jsx';
 import { Card } from '../components/ui/Kit.jsx';
@@ -102,7 +103,14 @@ export default function Settings() {
   const selected = sections.find(([id]) => id === section) || sections[0];
   const saveAccount = async (event) => { event.preventDefault(); try { await accountMutation.mutateAsync({ name: account.name.trim(), email: account.email.trim() }); flash('Datele contului au fost salvate.'); } catch (e) { flash(e.message); } };
   const savePassword = async (event) => { event.preventDefault(); try { await passwordMutation.mutateAsync(password); setPassword({ oldPassword: '', newPassword: '' }); flash('Parola a fost schimbată.'); } catch (e) { flash(e.message); } };
-  const deleteAccount = async (event) => { event.preventDefault(); if (!window.confirm('Ștergi definitiv contul și datele asociate?')) return; try { await deleteMutation.deleteAccount(deletePassword); navigate('/', { replace: true }); } catch (e) { flash(e.message); } };
+  const deleteAccount = async (event, googleProof) => {
+    event?.preventDefault();
+    if (!window.confirm('Dezactivezi definitiv contul? Datele personale vor fi eliminate, iar istoricul colaborărilor se va păstra anonim.')) return;
+    try {
+      await deleteMutation.deleteAccount(googleProof || { password: deletePassword });
+      navigate('/', { replace: true });
+    } catch (e) { flash(e.message); }
+  };
 
   return (
     <PageShell title="Setări" subtitle="Ajustează FairMatch pentru felul în care lucrezi." action={msg && <span role="status" className="inline-flex items-center gap-2 bg-fm-ink px-3 py-2 text-xs font-semibold text-white"><Icon name="check" className="h-4 w-4" />{msg}</span>}>
@@ -148,8 +156,10 @@ export default function Settings() {
           </div>}
 
           {section === 'security' && <div className="grid max-w-2xl gap-7">
-            <SettingBlock title="Parolă" text="Folosește o parolă nouă de cel puțin 8 caractere."><form onSubmit={savePassword} className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-fm-ink">Parola actuală<input required type="password" autoComplete="current-password" value={password.oldPassword} onChange={(e) => setPassword({ ...password, oldPassword: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><label className="text-sm font-medium text-fm-ink">Parola nouă<input required minLength={8} type="password" autoComplete="new-password" value={password.newPassword} onChange={(e) => setPassword({ ...password, newPassword: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><div className="sm:col-span-2"><Button type="submit" loading={passwordMutation.isPending}>Schimbă parola</Button></div></form></SettingBlock>
-            <SettingBlock title="Șterge contul" text="Acțiunea este definitivă și nu poate fi anulată."><form onSubmit={deleteAccount} className="flex flex-wrap items-end gap-3"><label className="min-w-48 flex-1 text-sm font-medium text-fm-ink">Confirmă parola<input required type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><button type="submit" disabled={deleteMutation.isPending} className="border border-red-500 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50">Șterge contul</button></form></SettingBlock>
+            <SettingBlock title="Parolă" text="Folosește o parolă nouă de cel puțin 12 caractere."><form onSubmit={savePassword} className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-fm-ink">Parola actuală<input required type="password" autoComplete="current-password" value={password.oldPassword} onChange={(e) => setPassword({ ...password, oldPassword: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><label className="text-sm font-medium text-fm-ink">Parola nouă<input required minLength={12} type="password" autoComplete="new-password" value={password.newPassword} onChange={(e) => setPassword({ ...password, newPassword: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><div className="sm:col-span-2"><Button type="submit" loading={passwordMutation.isPending}>Schimbă parola</Button></div></form></SettingBlock>
+            <SettingBlock title="Șterge contul" text="Contul va fi dezactivat și datele personale anonimizate. Proiectele, mesajele și evaluările deja asociate colaborărilor se păstrează pentru ceilalți participanți.">
+              {user?.hasPassword ? <form onSubmit={deleteAccount} className="flex flex-wrap items-end gap-3"><label className="min-w-48 flex-1 text-sm font-medium text-fm-ink">Confirmă parola<input required type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><button type="submit" disabled={deleteMutation.isPending} className="border border-red-500 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50">Șterge contul</button></form> : <GoogleReauthButton onSuccess={(proof) => deleteAccount(null, proof)} />}
+            </SettingBlock>
           </div>}
         </Card>
       </div>

@@ -14,7 +14,13 @@ const trustedProxies = (process.env.TRUSTED_PROXIES || "")
 if (trustedProxies.some((proxy) => ["*", "0.0.0.0/0", "::/0"].includes(proxy))) {
   throw new Error("TRUSTED_PROXIES must list specific trusted proxy addresses or subnets.");
 }
-if (trustedProxies.length) app.set("trust proxy", trustedProxies);
+const trustedProxyHops = process.env.TRUST_PROXY_HOPS === undefined ? 0 : Number(process.env.TRUST_PROXY_HOPS);
+if (!Number.isInteger(trustedProxyHops) || trustedProxyHops < 0 || trustedProxyHops > 5) {
+  throw new Error("TRUST_PROXY_HOPS must be an integer between 0 and 5.");
+}
+if (trustedProxyHops > 0 && trustedProxies.length) throw new Error("Configure TRUST_PROXY_HOPS or TRUSTED_PROXIES, not both.");
+if (trustedProxyHops > 0) app.set("trust proxy", trustedProxyHops);
+else if (trustedProxies.length) app.set("trust proxy", trustedProxies);
 
 app.disable("x-powered-by");
 app.use((req, res, next) => {

@@ -1,5 +1,5 @@
 const env = import.meta.env;
-const apiUrl = env.VITE_API_URL || 'http://localhost:4000/api';
+const apiUrl = env.VITE_API_URL || (env.PROD ? '/api' : 'http://localhost:4000/api');
 
 export const config = {
   apiUrl,
@@ -7,7 +7,8 @@ export const config = {
   useMock: env.VITE_USE_MOCK === 'true',
   currency: env.VITE_CURRENCY || 'EUR',
   locale: env.VITE_LOCALE || 'ro-RO',
-  refreshCookie: env.VITE_REFRESH_COOKIE === 'true',
+  // Backendul emite refresh token doar ca cookie HttpOnly; activează-l implicit.
+  refreshCookie: env.VITE_REFRESH_COOKIE !== 'false',
   // Serverul Multer acceptă maximum 5 MB; nu expune în client o limită mai mare.
   maxUploadMb: Math.min(5, Math.max(1, Number(env.VITE_MAX_UPLOAD_MB || 5) || 5)),
   contactEmail: env.VITE_CONTACT_EMAIL || 'contact@fairmatch.example',

@@ -7,7 +7,7 @@ const { Server } = require("socket.io");
 const prisma = require("./config/prisma");
 const { verifyAccessToken } = require("./utils/jwt");
 const { setIo } = require("./realtime");
-const { startMatchingWorker } = require("./services/matching/db-worker");
+const { startMatchingWorker, stopMatchingWorker } = require("./services/matching/db-worker");
 const port = Number(process.env.PORT) || 4000;
 
 if (!process.env.DATABASE_URL) {
@@ -83,4 +83,32 @@ startMatchingWorker();
 
 httpServer.listen(port, () => {
   console.log(`FairMatch API listening on http://localhost:${port}`);
+});
+
+let shuttingDown = false;
+function shutdown(signal, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Shutting down FairMatch API (${signal}).`);
+  stopMatchingWorker();
+  const timeout = setTimeout(() => process.exit(1), 10_000);
+  timeout.unref?.();
+  httpServer.close(async () => {
+    io.close();
+    try {
+      await prisma.$disconnect();
+      clearTimeout(timeout);
+      process.exit(exitCode);
+    } catch (error) {
+      console.error("Database disconnect failed during shutdown.", { code: error?.code || "UNKNOWN" });
+      process.exit(1);
+    }
+  });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection.", { message: String(reason?.message || reason).slice(0, 240) });
+  shutdown("unhandledRejection", 1);
 });

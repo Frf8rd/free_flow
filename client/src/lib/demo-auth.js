@@ -1,6 +1,5 @@
-// DEMO ONLY: disable this adapter when the backend's auth routes are ready.
-// Keep the preview login available until the API is ready; disable it with VITE_DEMO_AUTH=false.
-export const DEMO_AUTH_ENABLED = import.meta.env.VITE_DEMO_AUTH !== 'false';
+// DEMO ONLY: opt in explicitly in local development with VITE_DEMO_AUTH=true.
+export const DEMO_AUTH_ENABLED = import.meta.env.VITE_DEMO_AUTH === 'true';
 const STORAGE_KEY = 'fairmatch-demo-user';
 export const DEMO_PASSWORD = 'fairmatch-demo';
 

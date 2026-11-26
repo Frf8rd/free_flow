@@ -126,31 +126,35 @@ async function updateMyProfile(userId, input, db = prisma) {
     }
   }
 
-  const skillWrites = skillIds
-    ? skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } }))
-    : null;
-
-  const saved = await retryOnUniqueConflict(() =>
-    db.freelancerProfile.upsert({
+  const saved = await retryOnUniqueConflict(() => db.$transaction(async (tx) => {
+    const profile = await tx.freelancerProfile.upsert({
       where: { userId },
-      create: {
-        userId,
-        ...fields,
-        onboarded: false,
-        ...(skillWrites ? { skills: { create: skillWrites } } : {}),
-      },
-      update: {
-        ...fields,
-        ...(skillWrites ? { skills: { deleteMany: {}, create: skillWrites } } : {}),
-      },
-      select: { id: true, title: true, bio: true, hourlyRate: true, skills: { select: { skillId: true } } },
-    }),
-  );
+      create: { userId, ...fields, onboarded: false },
+      update: fields,
+      select: { id: true, title: true, bio: true },
+    });
 
-  // Tariful este opțional („La cerere”); nu bloca accesul dacă freelancerul
-  // și-a completat descrierea și abilitățile, dar preferă să stabilească tariful ulterior.
-  const complete = Boolean(saved.title?.trim().length >= 3 && saved.bio?.trim().length >= 30 && saved.skills.length > 0);
-  await db.freelancerProfile.update({ where: { id: saved.id }, data: { onboarded: complete } });
+    let skillCount;
+    if (skillIds !== undefined) {
+      if (skillIds.length) {
+        await tx.freelancerSkill.deleteMany({ where: { freelancerId: profile.id, skillId: { notIn: skillIds } } });
+        await tx.freelancerSkill.createMany({
+          data: skillIds.map((skillId) => ({ freelancerId: profile.id, skillId })),
+          skipDuplicates: true,
+        });
+      } else {
+        await tx.freelancerSkill.deleteMany({ where: { freelancerId: profile.id } });
+      }
+      skillCount = skillIds.length;
+    } else {
+      skillCount = await tx.freelancerSkill.count({ where: { freelancerId: profile.id } });
+    }
+
+    // Tariful este opțional („La cerere”); eligibilitatea se bazează pe profil și competențe.
+    const complete = Boolean(profile.title?.trim().length >= 3 && profile.bio?.trim().length >= 30 && skillCount > 0);
+    await tx.freelancerProfile.update({ where: { id: profile.id }, data: { onboarded: complete } });
+    return profile;
+  }));
 
   if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);
 

@@ -14,10 +14,16 @@ async function listMine(user, query = {}, db = prisma) {
   const statusMap = { new: 'SUGGESTED', interested: 'FREELANCER_INTERESTED', invited: 'CLIENT_INVITED', accepted: 'ACCEPTED' };
   const status = query.status ? statusMap[query.status] ?? query.status : null;
   if (status && !['SUGGESTED', 'FREELANCER_INTERESTED', 'CLIENT_INVITED', 'ACCEPTED', 'DISMISSED'].includes(status)) throw new AppError(400, 'VALIDATION_ERROR', 'Filtrul status nu este valid.');
+  const sideDismissalField = user.role === 'CLIENT' ? 'clientDismissedAt' : 'freelancerDismissedAt';
   const where = user.role === 'CLIENT'
     ? { project: { clientId: user.id, status: 'OPEN' }, ...(query.projectId ? { projectId: query.projectId } : {}) }
     : { freelancer: { userId: user.id }, project: { status: 'OPEN' } };
-  if (status) where.status = status;
+  if (status === 'DISMISSED') {
+    where.AND = [{ OR: [{ status: 'DISMISSED' }, { [sideDismissalField]: { not: null } }] }];
+  } else {
+    where.status = status || { not: 'DISMISSED' };
+    where[sideDismissalField] = null;
+  }
   const [total, data] = await Promise.all([
     db.match.count({ where }),
     db.match.findMany({ where, include: matchInclude, orderBy: user.role === 'CLIENT' ? [{ projectRank: 'asc' }, { score: 'desc' }] : [{ freelancerRank: 'asc' }, { score: 'desc' }], skip: (page - 1) * limit, take: limit }),
@@ -32,7 +38,7 @@ async function listForProject(user, projectId, db = prisma) {
   });
   if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
   if (project.clientId !== user.id) throw new AppError(403, 'FORBIDDEN', 'Poți vedea potrivirile doar pentru proiectele tale.');
-  const data = await db.match.findMany({ where: { projectId }, include: matchInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
+  const data = await db.match.findMany({ where: { projectId, clientDismissedAt: null, status: { not: 'DISMISSED' } }, include: matchInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
   const extracted = project.extracted && typeof project.extracted === 'object' ? project.extracted : {};
   return {
     status: project.matchingStatus || 'PENDING',
@@ -66,9 +72,12 @@ async function interest(user, id, db = prisma) {
   if (user.role !== 'FREELANCER') throw new AppError(403, 'FORBIDDEN', 'Doar freelancerul poate confirma interesul.');
   if (match.status === 'DISMISSED') throw new AppError(409, 'MATCH_DISMISSED', 'Potrivirea a fost ascunsă.');
   if (match.status === 'ACCEPTED') return { match, conversation: await createConversation(match, db) };
-  if (match.status === 'FREELANCER_INTERESTED') return { match, conversation: await createConversation(match, db) };
+  if (match.status === 'FREELANCER_INTERESTED') {
+    const updated = await db.match.update({ where: { id }, data: { clientDismissedAt: null }, include: matchInclude });
+    return { match: updated, conversation: await createConversation(updated, db) };
+  }
   const nextStatus = match.status === 'CLIENT_INVITED' ? 'ACCEPTED' : 'FREELANCER_INTERESTED';
-  const updated = await db.match.update({ where: { id }, data: { status: nextStatus }, include: matchInclude });
+  const updated = await db.match.update({ where: { id }, data: { status: nextStatus, clientDismissedAt: null }, include: matchInclude });
   const conversation = await createConversation(updated, db);
   void notifications.createNotification({ userId: updated.project.clientId, type: 'MATCH_INTEREST', title: 'Freelancer interesat', body: `${updated.freelancer.user.name} și-a arătat interesul pentru „${updated.project.title}”.`, data: { projectId: updated.projectId, matchId: id, conversationId: conversation.id } }, db).catch(() => {});
   return { match: updated, conversation };
@@ -82,7 +91,7 @@ async function invite(user, id, db = prisma) {
   if (match.status === 'ACCEPTED') return { match, conversation: await createConversation(match, db) };
   if (match.status === 'CLIENT_INVITED') return { match, conversation: await createConversation(match, db) };
   const nextStatus = match.status === 'FREELANCER_INTERESTED' ? 'ACCEPTED' : 'CLIENT_INVITED';
-  const updated = await db.match.update({ where: { id }, data: { status: nextStatus }, include: matchInclude });
+  const updated = await db.match.update({ where: { id }, data: { status: nextStatus, freelancerDismissedAt: null }, include: matchInclude });
   const conversation = await createConversation(updated, db);
   void notifications.createNotification({ userId: updated.freelancer.userId, type: 'MATCH_INVITE', title: 'Invitație la proiect', body: `Ai fost invitat la „${updated.project.title}”.`, data: { projectId: updated.projectId, matchId: id, conversationId: conversation.id } }, db).catch(() => {});
   return { match: updated, conversation };
@@ -93,12 +102,28 @@ async function inviteFreelancer(user, projectId, freelancerId, db = prisma) {
   if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul deschis nu a fost găsit.');
   const profile = await db.freelancerProfile.findFirst({ where: { userId: freelancerId, onboarded: true, user: { isBlocked: false } }, select: { id: true } });
   if (!profile) throw new AppError(404, 'FREELANCER_NOT_FOUND', 'Freelancerul nu a fost găsit.');
-  const match = await db.match.upsert({
-    where: { projectId_freelancerId: { projectId, freelancerId: profile.id } },
-    create: { projectId, freelancerId: profile.id, score: 0, reasons: { source: 'manual_invite' }, status: 'CLIENT_INVITED' },
-    update: { status: 'CLIENT_INVITED' },
-    include: matchInclude,
-  });
+  const inviteInTransaction = async (tx) => {
+    const existing = await tx.match.findUnique({
+      where: { projectId_freelancerId: { projectId, freelancerId: profile.id } },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      return tx.match.create({
+        data: { projectId, freelancerId: profile.id, score: 0, reasons: { source: 'manual_invite' }, status: 'CLIENT_INVITED' },
+        include: matchInclude,
+      });
+    }
+    if (existing.status === 'DISMISSED') throw new AppError(409, 'MATCH_DISMISSED', 'Această potrivire a fost ascunsă. Actualizează recomandările înainte de a invita din nou.');
+    const nextStatus = existing.status === 'SUGGESTED'
+      ? 'CLIENT_INVITED'
+      : existing.status === 'FREELANCER_INTERESTED' ? 'ACCEPTED' : existing.status;
+    await tx.match.updateMany({
+      where: { id: existing.id, status: existing.status },
+      data: { status: nextStatus, clientDismissedAt: null },
+    });
+    return tx.match.findUnique({ where: { id: existing.id }, include: matchInclude });
+  };
+  const match = db === prisma ? await db.$transaction(inviteInTransaction) : await inviteInTransaction(db);
   const conversation = await createConversation(match, db);
   void notifications.createNotification({ userId: freelancerId, type: 'MATCH_INVITE', title: 'Invitație la proiect', body: `Ai fost invitat la „${match.project.title}”.`, data: { projectId, matchId: match.id, conversationId: conversation.id } }, db).catch(() => {});
   return { match, conversation };
@@ -106,8 +131,9 @@ async function inviteFreelancer(user, projectId, freelancerId, db = prisma) {
 
 async function dismiss(user, id, reason, db = prisma) {
   const match = await getOwnedMatch(user, id, db);
-  if (match.status !== 'SUGGESTED') throw new AppError(409, 'MATCH_NOT_DISMISSABLE', 'Doar o recomandare nouă poate fi ascunsă.');
-  return db.match.update({ where: { id }, data: { status: 'DISMISSED', dismissReason: typeof reason === 'string' ? reason.slice(0, 240) : null } });
+  const field = user.role === 'CLIENT' ? 'clientDismissedAt' : 'freelancerDismissedAt';
+  if (match.status !== 'SUGGESTED' || match[field]) throw new AppError(409, 'MATCH_NOT_DISMISSABLE', 'Doar o recomandare nouă și vizibilă poate fi ascunsă.');
+  return db.match.update({ where: { id }, data: { [field]: new Date(), dismissReason: typeof reason === 'string' ? reason.slice(0, 240) : null } });
 }
 
 async function recordImpressions(user, matchIds, db = prisma) {

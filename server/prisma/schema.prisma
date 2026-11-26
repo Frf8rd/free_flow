@@ -269,6 +269,7 @@ model Project {
 
   @@index([status, categoryId])
   @@index([status, matchingStatus])
+  @@index([status, createdAt])
 }
 
 enum EngagementStatus {
@@ -457,6 +458,8 @@ model Match {
   reasons        Json
   status         MatchStatus       @default(SUGGESTED)
   dismissReason  String?
+  clientDismissedAt DateTime?
+  freelancerDismissedAt DateTime?
   projectRank    Int?
   freelancerRank Int?
   createdAt      DateTime          @default(now())

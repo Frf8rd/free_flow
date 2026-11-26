@@ -11,8 +11,8 @@ function safeKey(key) {
 
 async function save(buffer) {
   const key = cloudinary.newKey();
-  await cloudinary.upload('profile-images', buffer, key);
-  return key;
+  const uploaded = await cloudinary.upload('profile-images', buffer, key);
+  return { key, url: uploaded.url };
 }
 
 async function read(key) {
@@ -27,4 +27,8 @@ async function read(key) {
   }
 }
 
-module.exports = { save, read };
+function remove(key) {
+  return cloudinary.remove('profile-images', safeKey(key));
+}
+
+module.exports = { save, read, remove };

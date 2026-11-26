@@ -9,14 +9,23 @@ async function listConversations(userId, db = prisma) {
       engagement: { select: { status: true, project: { select: { id: true, title: true } } } },
       project: { select: { id: true, title: true } },
       match: { select: { status: true } },
-      client: { select: { id: true, name: true } },
-      freelancer: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, avatarUrl: true, role: true } },
+      freelancer: { select: { id: true, name: true, avatarUrl: true, role: true } },
       messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
       _count: { select: { messages: { where: { senderId: { not: userId }, readAt: null } } } },
     },
     orderBy: { updatedAt: "desc" },
   });
-  return rows.map((row) => ({ ...row, engagementStatus: row.engagement?.status ?? null, matchStatus: row.match?.status ?? null, lastMessage: row.messages[0] || null, unreadCount: row._count.messages, messages: undefined, _count: undefined }));
+  return rows.map((row) => ({
+    ...row,
+    other: row.clientId === userId ? row.freelancer : row.client,
+    engagementStatus: row.engagement?.status ?? null,
+    matchStatus: row.match?.status ?? null,
+    lastMessage: row.messages[0] || null,
+    unreadCount: row._count.messages,
+    messages: undefined,
+    _count: undefined,
+  }));
 }
 
 async function startConversation(user, projectId, otherUserId, db = prisma) {

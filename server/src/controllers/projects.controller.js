@@ -44,7 +44,7 @@ async function listMine(req, res) {
 }
 
 async function getById(req, res) {
-  res.json({ data: await projectsService.getProject(req.params.id) });
+  res.json({ data: await projectsService.getProject(req.params.id, undefined, req.user) });
 }
 
 async function matches(req, res) {

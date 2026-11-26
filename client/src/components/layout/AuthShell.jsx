@@ -170,6 +170,58 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
   );
 };
 
+// Reautentificare Google pentru acțiuni sensibile, fără a crea o sesiune nouă.
+export const GoogleReauthButton = ({ className = '', onSuccess }) => {
+  const buttonHost = useRef(null);
+  const successRef = useRef(onSuccess);
+  const [error, setError] = useState('');
+  successRef.current = onSuccess;
+
+  useEffect(() => {
+    let active = true;
+    let identity;
+    const render = (nonce) => {
+      if (!active || !identity || !buttonHost.current) return;
+      const host = buttonHost.current;
+      host.innerHTML = '';
+      identity.initialize({
+        client_id: config.googleClientId,
+        nonce,
+        use_fedcm_for_button: true,
+        use_fedcm_for_prompt: true,
+        callback: async ({ credential }) => {
+          if (!active) return;
+          try {
+            if (!credential) throw new Error('Google nu a returnat credentialul contului.');
+            await successRef.current?.({ credential, nonce });
+          } catch (reauthError) {
+            if (active) setError(reauthError.message || 'Reautentificarea Google a eșuat.');
+            try {
+              const nextChallenge = await auth.googleChallenge();
+              if (active) render(nextChallenge.nonce);
+            } catch { /* eroarea de reautentificare rămâne vizibilă */ }
+          }
+        },
+      });
+      identity.renderButton(host, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', logo_alignment: 'left', width: Math.max(200, Math.floor(host.getBoundingClientRect().width)), locale: 'ro' });
+    };
+    (async () => {
+      try {
+        if (!config.googleClientId) throw new Error('Lipsește VITE_GOOGLE_CLIENT_ID din configurație.');
+        const [{ nonce }, googleIdentity] = await Promise.all([auth.googleChallenge(), loadGoogleIdentity()]);
+        if (!active) return;
+        identity = googleIdentity;
+        render(nonce);
+      } catch (initError) {
+        if (active) setError(initError.message || 'Nu s-a putut încărca autentificarea Google.');
+      }
+    })();
+    return () => { active = false; if (buttonHost.current) buttonHost.current.innerHTML = ''; };
+  }, []);
+
+  return <div className={className}><div ref={buttonHost} className="min-h-12 w-full" aria-label="Confirmă identitatea cu Google" />{error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}</div>;
+};
+
 export const Divider = () => (
   <div className="my-6 flex items-center gap-4 text-xs text-fm-slate/50"><span className="h-px flex-1 bg-fm-graphite/10" /> sau <span className="h-px flex-1 bg-fm-graphite/10" /></div>
 );

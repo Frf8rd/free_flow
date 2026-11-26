@@ -22,6 +22,7 @@ const loaders = {
   Contact: () => import('../pages/Contact.jsx'),
   ForgotPassword: () => import('../pages/ForgotPassword.jsx'),
   ResetPassword: () => import('../pages/ResetPassword.jsx'),
+  EmailVerification: () => import('../pages/EmailVerification.jsx'),
   HowItWorks: () => import('../pages/HowItWorks.jsx'),
 };
 

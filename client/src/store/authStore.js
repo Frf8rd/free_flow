@@ -41,11 +41,9 @@ export const useAuth = create((set, get) => ({
   },
 
   async register(form) {
-    const d = await auth.register(form);
-    get().setSession(d);
-    set({ user: await auth.me().catch(() => d.user) });
-    track('register', { role: form.role });
-    return get().user;
+    const result = await auth.register(form);
+    track('register_started', { role: form.role });
+    return result;
   },
 
   async googleAuth({ credential, nonce, role, intent = 'login' }) {
@@ -61,7 +59,9 @@ export const useAuth = create((set, get) => ({
   },
 
   async updateAccount(changes) {
+    const previousRole = get().user?.role;
     const user = await auth.updateAccount(changes);
+    if (user.role && user.role !== previousRole) queryClient.clear();
     set((s) => ({ user: { ...s.user, ...user }, status: 'authed' }));
     return get().user;
   },

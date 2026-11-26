@@ -1,4 +1,4 @@
-const { randomBytes } = require("node:crypto");
+const { randomBytes, randomUUID } = require("node:crypto");
 const prisma = require("../config/prisma");
 const { signAccessToken } = require("../utils/jwt");
 const { hashPassword, verifyPassword, hashRefreshToken } = require("../utils/hash");
@@ -110,10 +110,8 @@ async function register(input) {
     });
     return { emailVerificationRequired: true, email };
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    if (error && error.code === "P2002") {
-      throw new AppError(409, "EMAIL_IN_USE", "Această adresă de email este deja înregistrată.");
-    }
+    if (error instanceof AppError && error.code !== "EMAIL_IN_USE") throw error;
+    if (error instanceof AppError || error?.code === "P2002") return { emailVerificationRequired: true, email };
     throw error;
   }
 }
@@ -271,21 +269,21 @@ async function loginWithProvider(provider, input) {
   const displayName = (typeof claims.name === "string" && claims.name) || email.split("@")[0];
   const name = displayName.trim().slice(0, 80) || email.split("@")[0];
 
-  const consumed = await prisma.oAuthChallenge.updateMany({
-    where: {
-      provider: config.prismaProvider,
-      nonceHash,
-      consumedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    data: { consumedAt: new Date() },
-  });
-  if (consumed.count !== 1) {
-    throw new AppError(401, "INVALID_OAUTH_CHALLENGE", "Cererea de autentificare a expirat sau a fost deja folosită.");
-  }
-
   try {
     return await prisma.$transaction(async (tx) => {
+      const consumed = await tx.oAuthChallenge.updateMany({
+        where: {
+          provider: config.prismaProvider,
+          nonceHash,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { consumedAt: new Date() },
+      });
+      if (consumed.count !== 1) {
+        throw new AppError(401, "INVALID_OAUTH_CHALLENGE", "Cererea de autentificare a expirat sau a fost deja folosită.");
+      }
+
       const linkedAccount = await tx.oAuthAccount.findUnique({
         where: {
           provider_providerUserId: {
@@ -492,7 +490,45 @@ async function assertReauthentication(userId, proof) {
 
 async function deleteAccount(userId, proof) {
   await assertReauthentication(userId, proof);
-  await prisma.user.delete({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, role: true, avatarUrl: true, dashboardBackgroundUrl: true },
+  });
+  if (!user) throw new AppError(404, "USER_NOT_FOUND", "Contul nu a fost găsit.");
+  if (user.role === "ADMIN") throw new AppError(403, "FORBIDDEN", "Conturile de administrator nu pot fi șterse din setările personale.");
+
+  await prisma.$transaction(async (tx) => {
+    await Promise.all([
+      tx.refreshToken.deleteMany({ where: { userId } }),
+      tx.oAuthAccount.deleteMany({ where: { userId } }),
+      tx.accountToken.deleteMany({ where: { userId } }),
+      tx.notification.deleteMany({ where: { userId } }),
+      tx.freelancerProfile.deleteMany({ where: { userId } }),
+      tx.clientProfile.deleteMany({ where: { userId } }),
+      tx.pendingRegistration.deleteMany({ where: { email: user.email } }),
+    ]);
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${randomUUID()}@deleted.invalid`,
+        name: "Cont șters",
+        passwordHash: null,
+        avatarUrl: null,
+        dashboardBackgroundUrl: null,
+        emailVerifiedAt: null,
+        isBlocked: true,
+        tokenVersion: { increment: 1 },
+      },
+    });
+  });
+
+  const storage = require("../utils/publicImageStorage");
+  const imageKeys = [...new Set([user.avatarUrl, user.dashboardBackgroundUrl]
+    .map((url) => typeof url === "string" ? url.match(/([a-f0-9-]{36}\.webp)(?:$|[?#])/i)?.[1] : null)
+    .filter(Boolean))];
+  await Promise.all(imageKeys.map((key) => storage.remove(key).catch((error) => {
+    console.error("Deleted account image cleanup failed.", { code: error?.code || "UNKNOWN" });
+  })));
 }
 
 async function changePassword(userId, input) {
@@ -530,17 +566,12 @@ async function changePassword(userId, input) {
   ]);
 }
 
-async function logout(userId) {
-  await prisma.$transaction([
-    prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    }),
-    prisma.user.update({
-      where: { id: userId },
-      data: { tokenVersion: { increment: 1 } },
-    }),
-  ]);
+async function logout(userId, refreshToken) {
+  if (typeof refreshToken !== "string" || refreshToken.length < 32 || refreshToken.length > 256) return;
+  await prisma.refreshToken.updateMany({
+    where: { userId, tokenHash: hashRefreshToken(refreshToken), revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 }
 
 module.exports = {
