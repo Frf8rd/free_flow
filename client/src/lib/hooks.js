@@ -10,7 +10,7 @@ export function useDebounce(value, ms = 350) {
 export function useDocumentTitle(title) {
   useEffect(() => {
     const prev = document.title;
-    document.title = title ? `${title} · FairMatch` : 'FairMatch — Freelancing cu șanse egale';
+    document.title = title ? `${title} · FairMatch` : 'FairMatch';
     return () => { document.title = prev; };
   }, [title]);
 }
