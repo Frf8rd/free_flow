@@ -2,12 +2,12 @@ services:
   - type: web
     name: fairmatch-api
     runtime: node
-    plan: 0.5c-512mb
+    plan: free
     region: frankfurt
     rootDir: server
     buildCommand: npm ci
-    preDeployCommand: npx prisma migrate deploy
-    startCommand: npm start
+    # Free web services don't support pre-deploy commands, so run migrations at startup.
+    startCommand: npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
