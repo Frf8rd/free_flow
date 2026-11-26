@@ -8,6 +8,7 @@ const {
   parse,
 } = require('../validators/freelancers.validator');
 const trustService = require('./trust.service');
+const { enqueueMatchingJob } = require('./matching/jobs');
 
 const MAX_PORTFOLIO_ITEMS = 20;
 
@@ -15,7 +16,8 @@ const portfolioSelect = {
   id: true,
   title: true,
   description: true,
-  projectUrl: true,
+  imageUrl: true,
+  link: true,
   createdAt: true,
   updatedAt: true,
 };
@@ -28,15 +30,19 @@ const freelancerSelect = {
   isBlocked: true,
   freelancerProfile: {
     select: {
+      id: true,
       title: true,
       bio: true,
       level: true,
       hourlyRate: true,
       availability: true,
       languages: true,
+      onboarded: true,
+      tier: true,
+      completedCount: true,
       createdAt: true,
       updatedAt: true,
-      skills: { select: { skill: { select: { id: true, name: true } } } },
+      skills: { select: { level: true, verified: true, skill: { select: { id: true, name: true, categoryId: true } } } },
       portfolio: {
         select: portfolioSelect,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -51,6 +57,8 @@ function toFreelancerDto(user) {
   const profile = user.freelancerProfile;
   return {
     id: user.id,
+    userId: user.id,
+    profileId: profile?.id ?? null,
     name: user.name,
     avatarUrl: user.avatarUrl ?? null,
     title: profile?.title ?? '',
@@ -59,10 +67,13 @@ function toFreelancerDto(user) {
     hourlyRate: profile?.hourlyRate ?? null,
     availability: profile?.availability ?? 'AVAILABLE',
     languages: profile?.languages ?? [],
+    onboarded: Boolean(profile?.onboarded),
+    tier: profile?.tier ?? 'START',
+    completedCount: profile?.completedCount ?? 0,
     skills: (profile?.skills ?? [])
-      .map((entry) => entry.skill)
+      .map((entry) => ({ ...entry.skill, level: entry.level, verified: entry.verified }))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    portfolio: profile?.portfolio ?? [],
+    portfolio: (profile?.portfolio ?? []).map(({ profileId, ...item }) => item),
     createdAt: profile?.createdAt ?? null,
     updatedAt: profile?.updatedAt ?? null,
   };
@@ -119,21 +130,27 @@ async function updateMyProfile(userId, input, db = prisma) {
     ? skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } }))
     : null;
 
-  await retryOnUniqueConflict(() =>
+  const saved = await retryOnUniqueConflict(() =>
     db.freelancerProfile.upsert({
       where: { userId },
       create: {
         userId,
         ...fields,
+        onboarded: false,
         ...(skillWrites ? { skills: { create: skillWrites } } : {}),
       },
       update: {
         ...fields,
         ...(skillWrites ? { skills: { deleteMany: {}, create: skillWrites } } : {}),
       },
-      select: { id: true },
+      select: { id: true, title: true, hourlyRate: true, skills: { select: { skillId: true } } },
     }),
   );
+
+  const complete = Boolean(saved.title?.trim() && saved.skills.length > 0 && saved.hourlyRate !== null);
+  await db.freelancerProfile.update({ where: { id: saved.id }, data: { onboarded: complete } });
+
+  if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);
 
   return getMyProfile(userId, db);
 }
@@ -167,10 +184,12 @@ async function createPortfolioItem(userId, input, db = prisma) {
     );
   }
 
-  return db.portfolioItem.create({
+  const item = await db.portfolioItem.create({
     data: { profileId: profile.id, ...data },
     select: portfolioSelect,
   });
+  if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);
+  return item;
 }
 
 // Verificarea proprietății: elementul trebuie să existe și să aparțină profilului utilizatorului curent.
@@ -190,16 +209,19 @@ async function findOwnedPortfolioItem(itemId, userId, db) {
 async function updatePortfolioItem(userId, itemId, input, db = prisma) {
   const data = parse(portfolioUpdateSchema, input);
   const item = await findOwnedPortfolioItem(itemId, userId, db);
-  return db.portfolioItem.update({
+  const updated = await db.portfolioItem.update({
     where: { id: item.id },
     data,
     select: portfolioSelect,
   });
+  if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);
+  return updated;
 }
 
 async function deletePortfolioItem(userId, itemId, db = prisma) {
   const item = await findOwnedPortfolioItem(itemId, userId, db);
   await db.portfolioItem.delete({ where: { id: item.id } });
+  if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);
 }
 
 module.exports = {

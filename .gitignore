@@ -2,3 +2,8 @@ client-test/
 server/scripts/
 server/private-storage/
 README.md
+
+server/node_modules
+server/.env
+
+server/src/generated/prisma

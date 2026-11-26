@@ -13,6 +13,7 @@ router.get("/me", controller.list);
 router.post("/", requireRole("FREELANCER"), mutationLimiter, controller.create);
 router.get("/:id", controller.getById);
 router.patch("/:id/status", mutationLimiter, controller.update);
+router.patch("/:id/ai-disclosure", requireRole("FREELANCER"), mutationLimiter, controller.discloseAi);
 router.post("/:id/reviews", mutationLimiter, reviewsController.create);
 
 module.exports = router;

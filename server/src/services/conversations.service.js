@@ -7,6 +7,8 @@ async function listConversations(userId, db = prisma) {
     where,
     include: {
       engagement: { select: { status: true, project: { select: { id: true, title: true } } } },
+      project: { select: { id: true, title: true } },
+      match: { select: { status: true } },
       client: { select: { id: true, name: true } },
       freelancer: { select: { id: true, name: true } },
       messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
@@ -14,7 +16,24 @@ async function listConversations(userId, db = prisma) {
     },
     orderBy: { updatedAt: "desc" },
   });
-  return rows.map((row) => ({ ...row, lastMessage: row.messages[0] || null, unreadCount: row._count.messages, messages: undefined, _count: undefined }));
+  return rows.map((row) => ({ ...row, engagementStatus: row.engagement?.status ?? null, matchStatus: row.match?.status ?? null, lastMessage: row.messages[0] || null, unreadCount: row._count.messages, messages: undefined, _count: undefined }));
+}
+
+async function startConversation(user, projectId, otherUserId, db = prisma) {
+  if (typeof projectId !== "string" || typeof otherUserId !== "string" || !projectId || !otherUserId || projectId === otherUserId) {
+    throw new AppError(400, "VALIDATION_ERROR", "Proiectul și celălalt participant sunt obligatorii.");
+  }
+  const project = await db.project.findUnique({ where: { id: projectId }, select: { id: true, clientId: true, status: true } });
+  if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  const isClient = user.role === "CLIENT" && project.clientId === user.id && project.status === "OPEN";
+  const isFreelancer = user.role === "FREELANCER";
+  if (!isClient && !isFreelancer) throw new AppError(403, "FORBIDDEN", "Nu poți porni conversația pentru acest proiect.");
+  const clientId = project.clientId;
+  const freelancerId = isClient ? otherUserId : user.id;
+  if (isFreelancer && otherUserId !== clientId) throw new AppError(403, "FORBIDDEN", "Celălalt participant trebuie să fie clientul proiectului.");
+  const match = await db.match.findFirst({ where: { projectId, freelancer: { userId: freelancerId }, status: { in: ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"] } }, select: { id: true } });
+  if (!match) throw new AppError(409, "MATCH_REQUIRED", "Conversația devine disponibilă după interesul freelancerului sau invitația clientului.");
+  return db.conversation.upsert({ where: { matchId: match.id }, create: { matchId: match.id, projectId, clientId, freelancerId }, update: {}, include: { project: { select: { id: true, title: true } } } });
 }
 
 async function getMessages(userId, conversationId, query = {}, db = prisma) {
@@ -38,10 +57,13 @@ async function sendMessage(userId, conversationId, input, db = prisma) {
   return db.$transaction(async (tx) => {
     const conversation = await tx.conversation.findFirst({
       where: { id: conversationId, OR: [{ clientId: userId }, { freelancerId: userId }] },
-      select: { id: true, engagement: { select: { status: true } } },
+      select: { id: true, engagement: { select: { status: true } }, match: { select: { status: true } } },
     });
     if (!conversation) throw new AppError(404, "CONVERSATION_NOT_FOUND", "Conversația nu a fost găsită.");
-    if (!["IN_PROGRESS", "DELIVERED"].includes(conversation.engagement.status)) {
+    const canMessage = conversation.engagement
+      ? ["IN_PROGRESS", "DELIVERED"].includes(conversation.engagement.status)
+      : Boolean(conversation.match && ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"].includes(conversation.match.status));
+    if (!canMessage) {
       throw new AppError(409, "CONVERSATION_CLOSED", "Nu mai poți trimite mesaje în această colaborare.");
     }
     const message = await tx.message.create({ data: { conversationId, senderId: userId, content }, include: { sender: { select: { id: true, name: true } } } });
@@ -57,4 +79,4 @@ async function markRead(userId, conversationId, db = prisma) {
   return { updated: result.count };
 }
 
-module.exports = { listConversations, getMessages, sendMessage, markRead };
+module.exports = { listConversations, startConversation, getMessages, sendMessage, markRead };

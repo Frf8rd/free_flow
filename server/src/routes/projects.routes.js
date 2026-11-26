@@ -17,6 +17,7 @@ router.use(authenticate);
 router.post("/", requireRole("CLIENT"), projectMutationLimiter, projectsController.create);
 router.get("/", projectsController.list);
 router.get("/me", requireRole("CLIENT"), projectsController.listMine);
+router.get("/:id/matches", requireRole("CLIENT"), projectsController.matches);
 router.patch("/:id", requireRole("CLIENT"), projectMutationLimiter, projectsController.update);
 router.patch("/:id/close", requireRole("CLIENT"), projectMutationLimiter, projectsController.close);
 router.patch("/:id/reopen", requireRole("CLIENT"), projectMutationLimiter, projectsController.reopen);

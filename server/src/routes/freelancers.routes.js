@@ -16,15 +16,18 @@ const mutationLimiter = rateLimit({
 router.use(authenticate);
 
 // KAN-58: căutare cu filtre și paginare. Trebuie declarată înaintea lui /:id.
-router.get("/", searchController.list);
+router.get("/", requireRole("CLIENT"), searchController.list);
 
 // Rutele /me trebuie declarate înaintea lui /:id
 router.get("/me", requireRole("FREELANCER"), controller.getMe);
 router.put("/me", requireRole("FREELANCER"), mutationLimiter, controller.updateMe);
+router.get("/me/tier", requireRole("FREELANCER"), controller.tier);
+router.get("/me/exposure", requireRole("FREELANCER"), controller.exposure);
 
 router.get("/me/portfolio", requireRole("FREELANCER"), controller.listPortfolio);
 router.post("/me/portfolio", requireRole("FREELANCER"), mutationLimiter, controller.createPortfolioItem);
 router.put("/me/portfolio/:itemId", requireRole("FREELANCER"), mutationLimiter, controller.updatePortfolioItem);
+router.patch("/me/portfolio/:itemId", requireRole("FREELANCER"), mutationLimiter, controller.updatePortfolioItem);
 router.delete("/me/portfolio/:itemId", requireRole("FREELANCER"), mutationLimiter, controller.deletePortfolioItem);
 
 router.get("/:id/reviews", reviewsController.listForFreelancer);

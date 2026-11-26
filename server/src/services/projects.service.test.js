@@ -95,7 +95,7 @@ test("listProjects limits public listing to open projects and applies pagination
   ]);
   assert.equal(receivedOptions.skip, 5);
   assert.equal(receivedOptions.take, 5);
-  assert.deepEqual(result, { data: [{ id: "project-1" }], page: 2, limit: 5, total: 2 });
+  assert.deepEqual(result, { data: [{ id: "project-1", matchesCount: 0, interestedCount: 0 }], page: 2, limit: 5, total: 2 });
 });
 
 test("listProjects scopes a client's own list and rejects invalid pagination", async () => {

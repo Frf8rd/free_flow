@@ -117,6 +117,9 @@ async function register(input) {
 }
 
 async function verifyEmail(token) {
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{40,64}$/.test(token)) {
+    throw new AppError(400, "INVALID_EMAIL_TOKEN", "Linkul de verificare este invalid sau a expirat.");
+  }
   const verifiedUser = await prisma.$transaction(async (tx) => {
     const verification = await accountSecurity.consumeEmailVerification(tx, token);
     return verification.registration
@@ -127,6 +130,7 @@ async function verifyEmail(token) {
           passwordHash: verification.registration.passwordHash,
           role: verification.registration.role,
           emailVerifiedAt: new Date(),
+          ...(verification.registration.role === "CLIENT" ? { clientProfile: { create: {} } } : { freelancerProfile: { create: {} } }),
         },
       })
       : verification.user;
@@ -321,6 +325,7 @@ async function loginWithProvider(provider, input) {
           role: input.role,
           passwordHash: null,
           emailVerifiedAt: new Date(),
+          ...(input.role === "CLIENT" ? { clientProfile: { create: {} } } : { freelancerProfile: { create: {} } }),
           oauthAccounts: {
             create: {
               provider: config.prismaProvider,

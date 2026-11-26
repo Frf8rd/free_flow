@@ -10,6 +10,11 @@ const freelancersRoutes = require("./freelancers.routes");
 const usersRoutes = require("./users.routes");
 const clientsRoutes = require("./clients.routes");
 const reviewsRoutes = require("./reviews.routes");
+const matchesRoutes = require("./matches.routes");
+const notificationsRoutes = require("./notifications.routes");
+const reportsRoutes = require("./reports.routes");
+const trustRoutes = require("./trust.routes");
+const uploadsRoutes = require("./uploads.routes");
 
 const router = Router();
 
@@ -25,5 +30,10 @@ router.use("/freelancers", freelancersRoutes);
 router.use("/users", usersRoutes);
 router.use("/clients", clientsRoutes);
 router.use("/reviews", reviewsRoutes);
+router.use("/matches", matchesRoutes);
+router.use("/notifications", notificationsRoutes);
+router.use("/reports", reportsRoutes);
+router.use("/trust", trustRoutes);
+router.use("/uploads", uploadsRoutes);
 
 module.exports = router;

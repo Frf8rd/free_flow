@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -23,6 +23,51 @@ enum ProjectStatus {
   IN_PROGRESS
   COMPLETED
   CLOSED
+}
+
+enum Level {
+  BEGINNER
+  JUNIOR
+  MID
+  SENIOR
+}
+
+enum Availability {
+  AVAILABLE
+  LIMITED
+  UNAVAILABLE
+}
+
+enum Tier {
+  START
+  VERIFIED
+  PROVEN
+  EXPERT
+}
+
+enum MatchStatus {
+  SUGGESTED
+  FREELANCER_INTERESTED
+  CLIENT_INVITED
+  ACCEPTED
+  DISMISSED
+}
+
+enum MatchingStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum RecommendationSide {
+  CLIENT
+  FREELANCER
+}
+
+enum MatchingJobType {
+  PROJECT
+  FREELANCER
 }
 
 enum AccountTokenPurpose {
@@ -54,22 +99,25 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  adminAccess   Admin?
-  refreshTokens RefreshToken[]
-  oauthAccounts OAuthAccount[]
-  projects      Project[]
-  accountTokens AccountToken[]
-  submittedReports Report[] @relation("ReportReporter")
-  resolvedReports Report[] @relation("ReportResolver")
-  clientEngagements Engagement[] @relation("EngagementClient")
-  freelancerEngagements Engagement[] @relation("EngagementFreelancer")
-  clientConversations Conversation[] @relation("ConversationClient")
-  freelancerConversations Conversation[] @relation("ConversationFreelancer")
-  sentMessages Message[]
-  projectAttachments ProjectAttachment[]
-  reviewsWritten Review[] @relation("ReviewAuthor")
-  reviewsReceived Review[] @relation("ReviewTarget")
-  portfolioItems PortfolioItem[]
+  adminAccess               Admin?
+  freelancerProfile         FreelancerProfile?
+  clientProfile             ClientProfile?
+  refreshTokens             RefreshToken[]
+  oauthAccounts             OAuthAccount[]
+  projects                  Project[]
+  accountTokens             AccountToken[]
+  submittedReports          Report[]                   @relation("ReportReporter")
+  resolvedReports           Report[]                   @relation("ReportResolver")
+  clientEngagements         Engagement[]               @relation("EngagementClient")
+  freelancerEngagements     Engagement[]               @relation("EngagementFreelancer")
+  clientConversations       Conversation[]             @relation("ConversationClient")
+  freelancerConversations   Conversation[]             @relation("ConversationFreelancer")
+  sentMessages              Message[]
+  projectAttachments        ProjectAttachment[]
+  reviewsWritten            Review[]                   @relation("ReviewAuthor")
+  reviewsReceived           Review[]                   @relation("ReviewTarget")
+  notifications             Notification[]
+  recommendationImpressions RecommendationImpression[] @relation("RecommendationViewer")
 }
 
 model Admin {
@@ -79,36 +127,36 @@ model Admin {
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId, expiresAt])
 }
 
 model OAuthAccount {
-  id                String       @id @default(cuid())
-  provider          AuthProvider
-  providerUserId    String
-  userId            String
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt         DateTime     @default(now())
+  id             String       @id @default(cuid())
+  provider       AuthProvider
+  providerUserId String
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
 
   @@unique([provider, providerUserId])
   @@unique([userId, provider])
 }
 
 model OAuthChallenge {
-  id        String       @id @default(cuid())
-  provider  AuthProvider
-  nonceHash String       @unique
-  expiresAt DateTime
+  id         String       @id @default(cuid())
+  provider   AuthProvider
+  nonceHash  String       @unique
+  expiresAt  DateTime
   consumedAt DateTime?
-  createdAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
 
   @@index([provider, expiresAt])
 }
@@ -134,29 +182,92 @@ model Skill {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  projects ProjectSkill[]
+  projects    ProjectSkill[]
+  freelancers FreelancerSkill[]
+}
+
+model FreelancerProfile {
+  id             String       @id @default(cuid())
+  userId         String       @unique
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String       @default("")
+  bio            String       @default("")
+  level          Level        @default(BEGINNER)
+  hourlyRate     Int?
+  availability   Availability @default(AVAILABLE)
+  languages      String[]     @default([])
+  onboarded      Boolean      @default(false)
+  tier           Tier         @default(START)
+  completedCount Int          @default(0)
+  matchedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  skills                    FreelancerSkill[]
+  portfolio                 PortfolioItem[]
+  matches                   Match[]
+  recommendationImpressions RecommendationImpression[]
+
+  @@index([availability, hourlyRate])
+}
+
+model ClientProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   @default("PERSON")
+  onboarded   Boolean  @default(false)
+  companyName String?
+  description String?
+  industry    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FreelancerSkill {
+  freelancerId String
+  skillId      String
+  level        Level             @default(BEGINNER)
+  verified     Boolean           @default(false)
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  skill        Skill             @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([freelancerId, skillId])
+  @@index([skillId])
 }
 
 model Project {
-  id          String        @id @default(cuid())
-  clientId    String
-  client      User          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  title       String
-  description String
-  categoryId  String
-  category    Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  budgetMin   Int?
-  budgetMax   Int?
-  deadline    DateTime?
-  status      ProjectStatus @default(OPEN)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String         @id @default(cuid())
+  clientId       String
+  client         User           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  categoryId     String
+  category       Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  budgetMin      Int?
+  budgetMax      Int?
+  deadline       DateTime?
+  status         ProjectStatus  @default(OPEN)
+  isStarter      Boolean        @default(false)
+  matchingStatus MatchingStatus @default(PENDING)
+  matchingError  String?
+  matchedAt      DateTime?
+  extracted      Json?
+  embedding      Float[]        @default([])
+  embeddingModel String?
+  embeddingHash  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  skills ProjectSkill[]
-  engagements Engagement[]
-  attachments ProjectAttachment[]
+  skills                    ProjectSkill[]
+  engagements               Engagement[]
+  attachments               ProjectAttachment[]
+  conversations             Conversation[]
+  matches                   Match[]
+  recommendationImpressions RecommendationImpression[]
 
   @@index([status, categoryId])
+  @@index([status, matchingStatus])
 }
 
 enum EngagementStatus {
@@ -170,6 +281,8 @@ enum EngagementStatus {
 
 model Engagement {
   id           String           @id @default(cuid())
+  matchId      String?          @unique
+  match        Match?           @relation(fields: [matchId], references: [id], onDelete: SetNull)
   projectId    String
   project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   clientId     String
@@ -177,6 +290,9 @@ model Engagement {
   freelancerId String
   freelancer   User             @relation("EngagementFreelancer", fields: [freelancerId], references: [id], onDelete: Cascade)
   status       EngagementStatus @default(PENDING)
+  agreedPrice  Int?
+  deadline     DateTime?
+  usedAi       Boolean?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   deliveredAt  DateTime?
@@ -193,8 +309,12 @@ model Engagement {
 
 model Conversation {
   id           String      @id @default(cuid())
-  engagementId String      @unique
-  engagement  Engagement  @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  engagementId String?     @unique
+  engagement   Engagement? @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  matchId      String?     @unique
+  match        Match?      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  projectId    String
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   clientId     String
   client       User        @relation("ConversationClient", fields: [clientId], references: [id], onDelete: Cascade)
   freelancerId String
@@ -210,7 +330,7 @@ model Conversation {
 model Message {
   id             String       @id @default(cuid())
   conversationId String
-  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content        String
@@ -224,6 +344,7 @@ model Message {
 model ProjectSkill {
   projectId String
   skillId   String
+  source    String  @default("USER")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
@@ -309,15 +430,94 @@ model Review {
 }
 
 model PortfolioItem {
-  id           String   @id @default(cuid())
-  freelancerId String
-  freelancer   User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  title        String
-  description  String?
-  url          String?
-  imageUrl     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String            @id @default(cuid())
+  profileId      String
+  profile        FreelancerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  imageUrl       String?
+  link           String?
+  embedding      Float[]           @default([])
+  embeddingModel String?
+  embeddingHash  String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  @@index([freelancerId, createdAt])
+  @@index([profileId, createdAt])
+}
+
+model Match {
+  id             String            @id @default(cuid())
+  projectId      String
+  freelancerId   String
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer     FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  score          Float
+  reasons        Json
+  status         MatchStatus       @default(SUGGESTED)
+  dismissReason  String?
+  projectRank    Int?
+  freelancerRank Int?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  engagement     Engagement?
+  conversation   Conversation?
+
+  @@unique([projectId, freelancerId])
+  @@index([freelancerId, status])
+  @@index([projectId, score])
+  @@index([projectId, projectRank])
+  @@index([freelancerId, freelancerRank])
+}
+
+model RecommendationImpression {
+  id           String             @id @default(cuid())
+  projectId    String
+  freelancerId String
+  viewerUserId String
+  side         RecommendationSide
+  rank         Int
+  slotType     String             @default("STANDARD")
+  day          DateTime           @db.Date
+  shownAt      DateTime           @default(now())
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer   FreelancerProfile  @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  viewer       User               @relation("RecommendationViewer", fields: [viewerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, freelancerId, viewerUserId, side, day])
+  @@index([freelancerId, side, shownAt])
+  @@index([projectId, side, shownAt])
+}
+
+model MatchingJob {
+  id        String          @id @default(cuid())
+  type      MatchingJobType
+  targetId  String
+  revision  Int             @default(0)
+  attempts  Int             @default(0)
+  nextRunAt DateTime        @default(now())
+  lockedAt  DateTime?
+  lastError String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([type, targetId])
+  @@index([nextRunAt, lockedAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String    @default("")
+  data      Json?
+  dedupeKey String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, dedupeKey])
 }

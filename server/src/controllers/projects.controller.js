@@ -1,6 +1,7 @@
 const projectsService = require("../services/projects.service");
 const { writeAuditLog } = require("../utils/auditLog");
 const { getIo } = require("../realtime");
+const matchesService = require("../services/matches.service");
 
 async function create(req, res) {
   const project = await projectsService.createProject(req.user.id, req.body);
@@ -46,4 +47,8 @@ async function getById(req, res) {
   res.json({ data: await projectsService.getProject(req.params.id) });
 }
 
-module.exports = { create, update, close, reopen, remove, list, listMine, getById };
+async function matches(req, res) {
+  res.json({ data: await matchesService.listForProject(req.user, req.params.id) });
+}
+
+module.exports = { create, update, close, reopen, remove, list, listMine, getById, matches };

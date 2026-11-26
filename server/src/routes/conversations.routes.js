@@ -8,6 +8,7 @@ const messageLimiter = rateLimit({ name: "chat-message", windowMs: 60 * 1000, ma
 
 router.use(authenticate);
 router.get("/", controller.list);
+router.post("/", messageLimiter, controller.create);
 router.get("/:id/messages", controller.messages);
 router.post("/:id/messages", messageLimiter, controller.send);
 router.patch("/:id/read", controller.read);

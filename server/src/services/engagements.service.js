@@ -9,11 +9,27 @@ const include = {
   conversation: { select: { id: true } },
 };
 
-async function createEngagement(freelancerId, projectId, db = prisma) {
-  if (typeof projectId !== "string" || !projectId.trim()) {
+async function createEngagement(freelancerId, input, db = prisma) {
+  const payload = typeof input === "string" ? { projectId: input } : input;
+  const { projectId, matchId } = payload || {};
+  const agreedPrice = payload?.agreedPrice;
+  let deadline = null;
+  if (agreedPrice !== undefined && (!Number.isSafeInteger(agreedPrice) || agreedPrice < 0)) throw new AppError(400, "VALIDATION_ERROR", "Prețul propus nu este valid.");
+  if (payload?.deadline !== undefined && payload.deadline !== null && payload.deadline !== "") {
+    if (typeof payload.deadline !== "string" || Number.isNaN(Date.parse(payload.deadline))) throw new AppError(400, "VALIDATION_ERROR", "Termenul propus nu este valid.");
+    deadline = new Date(payload.deadline);
+  }
+  let matched = null;
+  if (matchId !== undefined) {
+    matched = await db.match.findUnique({ where: { id: matchId }, include: { project: { select: { id: true, clientId: true, status: true } }, freelancer: { select: { userId: true } } } });
+    if (!matched || matched.freelancer.userId !== freelancerId) throw new AppError(404, "MATCH_NOT_FOUND", "Potrivirea nu a fost găsită.");
+    if (!["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"].includes(matched.status)) throw new AppError(409, "MATCH_REQUIRED", "Este nevoie de o potrivire activă înainte de propunere.");
+  }
+  const selectedProjectId = matched?.projectId ?? projectId;
+  if (typeof selectedProjectId !== "string" || !selectedProjectId.trim()) {
     throw new AppError(400, "VALIDATION_ERROR", "Proiectul selectat nu este valid.");
   }
-  projectId = projectId.trim();
+  projectId = selectedProjectId.trim();
   const project = await db.project.findUnique({ where: { id: projectId }, select: { id: true, clientId: true, status: true } });
   if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
   if (project.clientId === freelancerId) throw new AppError(400, "OWN_PROJECT", "Nu poți solicita colaborarea la propriul proiect.");
@@ -30,12 +46,12 @@ async function createEngagement(freelancerId, projectId, db = prisma) {
   if (existing) {
     return db.engagement.update({
       where: { id: existing.id },
-      data: { status: "PENDING", rejectedAt: null, cancelledAt: null },
+      data: { status: "PENDING", rejectedAt: null, cancelledAt: null, ...(matched ? { matchId: matched.id } : {}), ...(agreedPrice !== undefined ? { agreedPrice } : {}), ...(deadline !== null ? { deadline } : {}) },
       include,
     });
   }
   try {
-    return await db.engagement.create({ data: { projectId, clientId: project.clientId, freelancerId }, include });
+    return await db.engagement.create({ data: { projectId, clientId: project.clientId, freelancerId, ...(matched ? { matchId: matched.id } : {}), ...(agreedPrice !== undefined ? { agreedPrice } : {}), ...(deadline !== null ? { deadline } : {}) }, include });
   } catch (error) {
     if (error?.code === "P2002") throw new AppError(409, "ENGAGEMENT_EXISTS", "Ai deja o cerere sau o colaborare pentru acest proiect.");
     throw error;
@@ -99,12 +115,19 @@ async function updateEngagement(actor, id, status, db = prisma) {
       ...(status === "CANCELLED" ? { cancelledAt: now } : {}),
     };
     const engagement = await tx.engagement.update({ where: { id }, data, include });
+    if (["REJECTED", "CANCELLED"].includes(status) && item.matchId) {
+      await tx.match.update({ where: { id: item.matchId }, data: { status: "DISMISSED" } });
+    }
     if (status !== "IN_PROGRESS" || item.status !== "PENDING") return { engagement };
 
-    const conversation = await tx.conversation.create({
-      data: { engagementId: id, clientId: item.clientId, freelancerId: item.freelancerId },
-      select: { id: true },
-    });
+    if (status === "COMPLETED") {
+      const profile = await tx.freelancerProfile.findUnique({ where: { userId: item.freelancerId }, select: { id: true } });
+      if (profile) await tx.freelancerProfile.update({ where: { id: profile.id }, data: { completedCount: { increment: 1 } } });
+    }
+    if (item.matchId) await tx.match.update({ where: { id: item.matchId }, data: { status: "ACCEPTED" } });
+    const conversation = item.matchId
+      ? await tx.conversation.upsert({ where: { matchId: item.matchId }, create: { matchId: item.matchId, engagementId: id, projectId: item.projectId, clientId: item.clientId, freelancerId: item.freelancerId }, update: { engagementId: id }, select: { id: true } })
+      : await tx.conversation.create({ data: { engagementId: id, projectId: item.projectId, clientId: item.clientId, freelancerId: item.freelancerId }, select: { id: true } });
     return {
       engagement: { ...engagement, conversation },
       emailRecipient: item.freelancer,
@@ -136,4 +159,13 @@ async function updateEngagement(actor, id, status, db = prisma) {
   return result.engagement;
 }
 
-module.exports = { createEngagement, listEngagements, getEngagement, updateEngagement };
+async function discloseAiUse(user, id, usedAi, db = prisma) {
+  if (typeof usedAi !== "boolean") throw new AppError(400, "VALIDATION_ERROR", "usedAi trebuie să fie true sau false.");
+  const engagement = await db.engagement.findUnique({ where: { id }, select: { id: true, freelancerId: true, status: true } });
+  if (!engagement) throw new AppError(404, "ENGAGEMENT_NOT_FOUND", "Colaborarea nu a fost găsită.");
+  if (user.role !== "FREELANCER" || engagement.freelancerId !== user.id) throw new AppError(403, "FORBIDDEN", "Doar freelancerul colaborării poate declara folosirea AI.");
+  if (!["DELIVERED", "COMPLETED"].includes(engagement.status)) throw new AppError(409, "ENGAGEMENT_NOT_DELIVERED", "Declarația devine disponibilă după predarea lucrării.");
+  return db.engagement.update({ where: { id }, data: { usedAi }, include });
+}
+
+module.exports = { createEngagement, listEngagements, getEngagement, updateEngagement, discloseAiUse };

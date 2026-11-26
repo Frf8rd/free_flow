@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 const prisma = require("./config/prisma");
 const { verifyAccessToken } = require("./utils/jwt");
 const { setIo } = require("./realtime");
+const { startMatchingWorker } = require("./services/matching/db-worker");
 const port = Number(process.env.PORT) || 4000;
 
 if (!process.env.DATABASE_URL) {
@@ -78,6 +79,7 @@ io.on("connection", (socket) => {
 });
 
 setIo(io);
+startMatchingWorker();
 
 httpServer.listen(port, () => {
   console.log(`FairMatch API listening on http://localhost:${port}`);

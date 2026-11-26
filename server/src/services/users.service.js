@@ -42,26 +42,31 @@ async function changeEmail(current, data, proof, db, deps) {
   await deps.assertReauthentication(current.id, proof);
   await assertEmailAvailable(data.email, db);
 
-  let updated;
   try {
-    [updated] = await db.$transaction([
-      db.user.update({
+    const updated = await db.$transaction(async (tx) => {
+      const user = await tx.user.update({
         where: { id: current.id },
         data: { ...data, emailVerifiedAt: null, tokenVersion: { increment: 1 } },
         select: userSelect,
-      }),
-      db.refreshToken.updateMany({
+      });
+      if (data.role === "CLIENT") await tx.clientProfile.upsert({ where: { userId: current.id }, create: { userId: current.id }, update: {} });
+      if (data.role === "FREELANCER") await tx.freelancerProfile.upsert({ where: { userId: current.id }, create: { userId: current.id }, update: {} });
+      await tx.refreshToken.updateMany({
         where: { userId: current.id, revokedAt: null },
         data: { revokedAt: new Date() },
-      }),
-    ]);
+      });
+      return user;
+    });
+    return await finishEmailChange(current, updated, deps, db);
   } catch (error) {
     if (error && error.code === "P2002") {
       throw new AppError(409, "EMAIL_IN_USE", "Această adresă de email este deja înregistrată.");
     }
     throw error;
   }
+}
 
+async function finishEmailChange(current, updated, deps, db) {
   let verificationEmailSent = true;
   try {
     await deps.sendVerificationEmail({ id: updated.id, email: updated.email, name: updated.name }, db);
@@ -80,15 +85,26 @@ async function changeEmail(current, data, proof, db, deps) {
 
 async function updateMe(currentUser, input, { db = prisma, ...overrides } = {}) {
   const deps = { ...defaultDeps, ...overrides };
-  const { email, password, credential, nonce, ...profile } = parse(userPatchSchema, input);
+  const { email, password, credential, nonce, role, ...profile } = parse(userPatchSchema, input);
 
   const data = {};
   if (profile.name !== undefined) data.name = profile.name;
   if (profile.avatarUrl !== undefined) data.avatarUrl = profile.avatarUrl;
 
   if (email !== undefined && email !== currentUser.email) {
-    return changeEmail(currentUser, { ...data, email }, { password, credential, nonce }, db, deps);
+    return changeEmail(currentUser, { ...data, email, ...(role ? { role } : {}) }, { password, credential, nonce }, db, deps);
   }
+
+  if (role !== undefined && role !== currentUser.role) {
+    const updated = await db.$transaction(async (tx) => {
+      const user = await tx.user.update({ where: { id: currentUser.id }, data: { ...data, role }, select: userSelect });
+      if (role === "CLIENT") await tx.clientProfile.upsert({ where: { userId: currentUser.id }, create: { userId: currentUser.id }, update: {} });
+      else await tx.freelancerProfile.upsert({ where: { userId: currentUser.id }, create: { userId: currentUser.id }, update: {} });
+      return user;
+    });
+    return { user: updated, emailChanged: false };
+  }
+
   if (Object.keys(data).length === 0) {
     return { user: await db.user.findUnique({ where: { id: currentUser.id }, select: userSelect }), emailChanged: false };
   }

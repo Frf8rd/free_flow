@@ -1,8 +1,10 @@
 const service = require("../services/engagements.service");
 const { getIo } = require("../realtime");
+const notifications = require("../services/notifications.service");
 
 async function create(req, res) {
-  const engagement = await service.createEngagement(req.user.id, req.body?.projectId);
+  const engagement = await service.createEngagement(req.user.id, req.body);
+  void notifications.notifyEngagementRequested(engagement);
   const io = getIo();
   if (io) {
     io.to(`user:${engagement.clientId}`).emit("engagement:new", {
@@ -12,6 +14,10 @@ async function create(req, res) {
     });
   }
   res.status(201).json({ data: engagement });
+}
+
+async function discloseAi(req, res) {
+  res.json({ data: await service.discloseAiUse(req.user, req.params.id, req.body?.usedAi) });
 }
 
 async function list(req, res) {
@@ -24,6 +30,7 @@ async function getById(req, res) {
 
 async function update(req, res) {
   const engagement = await service.updateEngagement(req.user, req.params.id, req.body?.status);
+  void notifications.notifyEngagementUpdated(engagement, req.user.id);
   const io = getIo();
   if (io) {
     const event = {
@@ -39,4 +46,4 @@ async function update(req, res) {
   res.json({ data: engagement });
 }
 
-module.exports = { create, list, getById, update };
+module.exports = { create, list, getById, update, discloseAi };

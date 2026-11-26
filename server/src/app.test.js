@@ -31,8 +31,8 @@ test("health and protected authentication routes return expected access control"
     const deleteAccount = await fetch(`${baseUrl}/auth/me`, { method: "DELETE" });
     assert.equal(deleteAccount.status, 401);
 
-    const removedProfileRoute = await fetch(`${baseUrl}/clients/me`);
-    assert.equal(removedProfileRoute.status, 404);
+    const protectedClientProfile = await fetch(`${baseUrl}/clients/me`);
+    assert.equal(protectedClientProfile.status, 401);
 
     const protectedRoleRoute = await fetch(`${baseUrl}/access/client`);
     assert.equal(protectedRoleRoute.status, 401);

@@ -7,7 +7,8 @@ const httpsUrl = z
   .max(2048)
   .refine((value) => {
     try {
-      return new URL(value).protocol === "https:";
+      const url = new URL(value);
+      return url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname));
     } catch {
       return false;
     }
@@ -19,6 +20,7 @@ const name = z.string().trim().min(2, "Numele este prea scurt.").max(100, "Numel
 const userPatchSchema = z
   .object({
     name: name.optional(),
+    role: z.enum(["CLIENT", "FREELANCER"]).optional(),
     avatarUrl: httpsUrl.nullable().optional(),
     email: z
       .string()
@@ -34,7 +36,7 @@ const userPatchSchema = z
   })
   .strict()
   .refine(
-    (value) => ["name", "avatarUrl", "email"].some((field) => value[field] !== undefined),
+    (value) => ["name", "avatarUrl", "email", "role"].some((field) => value[field] !== undefined),
     "Trimite cel puțin un câmp de modificat."
   );
 
@@ -43,6 +45,10 @@ const clientProfileSchema = z
   .object({
     name: name.optional(),
     avatarUrl: httpsUrl.nullable().optional(),
+    type: z.enum(["PERSON", "COMPANY"]).optional(),
+    companyName: z.string().trim().max(160).nullable().optional(),
+    description: z.string().trim().max(2000).nullable().optional(),
+    industry: z.string().trim().max(100).nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, "Trimite cel puțin un câmp de modificat.");

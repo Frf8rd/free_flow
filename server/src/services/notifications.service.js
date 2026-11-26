@@ -177,6 +177,7 @@ function notifyNewMessage({ conversationId, senderId, senderName }, db = prisma)
       select: {
         clientId: true,
         freelancerId: true,
+        project: { select: { id: true, title: true } },
         engagement: { select: { id: true, projectId: true, project: { select: { title: true } } } },
       },
     });
@@ -186,10 +187,10 @@ function notifyNewMessage({ conversationId, senderId, senderName }, db = prisma)
       userId,
       type: TYPES.NEW_MESSAGE,
       title: "Mesaj nou",
-      body: `${senderName} ți-a scris în „${conversation.engagement.project.title}”.`,
+    body: `${senderName} ți-a scris în „${conversation.project?.title ?? conversation.engagement?.project?.title ?? 'proiect'}”.`,
       data: {
-        engagementId: conversation.engagement.id,
-        projectId: conversation.engagement.projectId,
+        ...(conversation.engagementId || conversation.engagement?.id ? { engagementId: conversation.engagementId ?? conversation.engagement.id } : {}),
+        projectId: conversation.project?.id ?? conversation.engagement?.projectId,
         conversationId,
       },
       dedupeKey: `message:${conversationId}`,

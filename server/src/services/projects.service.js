@@ -1,14 +1,16 @@
 const prisma = require("../config/prisma");
 const { AppError } = require("../utils/errors");
 const attachmentStorage = require("../utils/projectAttachmentStorage");
+const { enqueueMatchingJob } = require("./matching/jobs");
 
 const PROJECT_STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED"]);
 const projectInclude = {
   category: { select: { id: true, name: true } },
-  client: { select: { id: true, name: true } },
+  client: { select: { id: true, name: true, avatarUrl: true, clientProfile: { select: { type: true, companyName: true } } } },
+  _count: { select: { matches: true } },
   skills: {
     include: {
-      skill: { select: { id: true, name: true } },
+      skill: { select: { id: true, name: true, categoryId: true } },
     },
   },
 };
@@ -106,7 +108,7 @@ async function createProject(clientId, input, db = prisma) {
     }
   }
 
-  return db.project.create({
+  const project = await db.project.create({
     data: {
       clientId,
       title,
@@ -121,6 +123,8 @@ async function createProject(clientId, input, db = prisma) {
     },
     include: projectInclude,
   });
+  if (db === prisma) await enqueueMatchingJob("PROJECT", project.id, db);
+  return project;
 }
 
 function validateProjectInput(input) {
@@ -243,11 +247,13 @@ async function updateProject(projectId, clientId, input, db = prisma) {
     data.skills = { deleteMany: {} };
   }
 
-  return db.project.update({
+  const updated = await db.project.update({
     where: { id: project.id },
     data,
     include: projectInclude,
   });
+  if (db === prisma && project.status === "OPEN") await enqueueMatchingJob("PROJECT", updated.id, db);
+  return updated;
 }
 
 async function closeProject(projectId, clientId, db = prisma) {
@@ -265,11 +271,13 @@ async function reopenProject(projectId, clientId, db = prisma) {
   if (project.status !== "CLOSED") {
     throw new AppError(409, "PROJECT_NOT_CLOSED", "Doar proiectele închise pot fi redeschise.");
   }
-  return db.project.update({
+  const reopened = await db.project.update({
     where: { id: project.id },
     data: { status: "OPEN" },
     include: projectInclude,
   });
+  if (db === prisma) await enqueueMatchingJob("PROJECT", reopened.id, db);
+  return reopened;
 }
 
 async function deleteProject(projectId, clientId, db = prisma) {
@@ -336,7 +344,13 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
       take: limit,
     }),
   ]);
-  return { data, page, limit, total };
+  const projectIds = data.map(({ id }) => id);
+  const interested = projectIds.length && db.match?.groupBy
+    ? await db.match.groupBy({ by: ["projectId", "status"], where: { projectId: { in: projectIds }, status: { in: ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"] } }, _count: { _all: true } })
+    : [];
+  const interestedByProject = new Map();
+  for (const row of interested) interestedByProject.set(row.projectId, (interestedByProject.get(row.projectId) ?? 0) + row._count._all);
+  return { data: data.map(({ _count, ...project }) => ({ ...project, matchesCount: _count?.matches ?? 0, interestedCount: interestedByProject.get(project.id) ?? 0 })), page, limit, total };
 }
 
 async function getProject(id, db = prisma) {

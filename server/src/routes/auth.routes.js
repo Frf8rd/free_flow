@@ -94,12 +94,19 @@ router.post("/email-verification/confirm", emailVerificationLimiter, async (req,
 router.post("/password-reset/request", passwordResetLimiter, async (req, res) => {
   res.json(await accountSecurity.requestPasswordReset(getEmailInput(req)));
 });
+router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
+  res.json(await accountSecurity.requestPasswordReset(getEmailInput(req)));
+});
 
 router.post("/password-reset/confirm", passwordResetLimiter, async (req, res) => {
   await accountSecurity.resetPassword(
     req.body && req.body.token,
     req.body && req.body.newPassword,
   );
+  res.json({ message: "Parola a fost resetată. Te poți autentifica." });
+});
+router.post("/reset-password", passwordResetLimiter, async (req, res) => {
+  await accountSecurity.resetPassword(req.body && req.body.token, req.body && req.body.password);
   res.json({ message: "Parola a fost resetată. Te poți autentifica." });
 });
 
@@ -127,7 +134,7 @@ router.post("/change-password", authenticate, sensitiveActionLimiter, async (req
 router.get("/me", authenticate, async (req, res) => {
   const credentials = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { passwordHash: true },
+    select: { passwordHash: true, isBlocked: true, createdAt: true, clientProfile: { select: { onboarded: true } }, freelancerProfile: { select: { onboarded: true } } },
   });
   const safeUser = {
     id: req.user.id,
@@ -135,6 +142,9 @@ router.get("/me", authenticate, async (req, res) => {
     name: req.user.name,
     role: req.user.role,
     avatarUrl: req.user.avatarUrl,
+    isBlocked: credentials?.isBlocked ?? false,
+    createdAt: credentials?.createdAt ?? null,
+    onboarded: req.user.role === "ADMIN" || (req.user.role === "FREELANCER" ? Boolean(credentials?.freelancerProfile?.onboarded) : Boolean(credentials?.clientProfile?.onboarded)),
     hasPassword: Boolean(credentials && credentials.passwordHash),
   };
   res.json({ user: safeUser });
