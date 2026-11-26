@@ -15,7 +15,7 @@ async function findProject(projectId, db = prisma) {
 }
 
 async function assertCanView(user, project, db = prisma) {
-  if (project.status === "OPEN" || user?.id === project.clientId) return;
+  if (project.status === "OPEN" || user?.id === project.clientId || user?.role === "ADMIN") return;
   if (!user?.id) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
   const acceptedEngagement = await db.engagement.findFirst({
     where: {

@@ -4,10 +4,10 @@ import PageShell from '../components/layout/PageShell.jsx';
 import Button from '../components/ui/Button.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { Textarea } from '../components/ui/Fields.jsx';
-import { Async, Card, Empty, Pagination, StatCard, Status, Tabs } from '../components/ui/Kit.jsx';
+import { Async, Card, Empty, Pagination, StatCard, Status } from '../components/ui/Kit.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 import { useAuth } from '../store/authStore.js';
-import { useAdminProjects, useAdminRemoveProject, useAdminReports, useAdminResolveReport, useAdminStats, useAdminUpdateProject, useAdminUpdateUser, useAdminUsers } from '../hooks/queries.js';
+import { useAdminActivity, useAdminProjects, useAdminRemoveProject, useAdminReports, useAdminResolveReport, useAdminStats, useAdminUpdateProject, useAdminUpdateUser, useAdminUsers } from '../hooks/queries.js';
 import { useDebounce } from '../lib/hooks.js';
 import { PROJECT_STATUS, ROLE_LABEL, formatDate, formatDateTime, timeAgo } from '../lib/format.js';
 
@@ -223,13 +223,41 @@ function Reports() {
   );
 }
 
-const TABS = [{ label: 'Statistici' }, { label: 'Utilizatori' }, { label: 'Proiecte' }, { label: 'Raportări' }];
+const activityGroups = [
+  ['Potriviri', 'matches', { SUGGESTED: 'Recomandate', CLIENT_INVITED: 'Invitații', FREELANCER_INTERESTED: 'Interes trimis', ACCEPTED: 'Acceptate', DISMISSED: 'Ascunse' }],
+  ['Calculul potrivirilor', 'matchingProjects', { PENDING: 'În așteptare', RUNNING: 'În calcul', DONE: 'Terminate', FAILED: 'Cu erori' }],
+  ['Colaborări', 'engagements', { PENDING: 'În așteptare', IN_PROGRESS: 'În lucru', DELIVERED: 'Livrate', COMPLETED: 'Finalizate', REJECTED: 'Respinse', CANCELLED: 'Anulate' }],
+];
+
+function Activity() {
+  const query = useAdminActivity();
+  return <Async q={query}>{(data) => <div className="grid gap-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {[
+        ['Conturi noi în 7 zile', 'newUsers', 'users'], ['Proiecte noi în 7 zile', 'newProjects', 'briefcase'],
+        ['Conturi blocate', 'blockedUsers', 'shield'], ['Conversații', 'conversations', 'chat'],
+        ['Mesaje', 'messages', 'chat'], ['Recenzii', 'reviews', 'star'], ['Sarcini de matching în coadă', 'jobs', 'sparkle'],
+      ].map(([label, key, icon]) => <StatCard key={key} label={label} value={data[key]} icon={icon} />)}
+    </div>
+    <div className="grid gap-4 lg:grid-cols-3">
+      {activityGroups.map(([title, key, labels]) => {
+        const items = Object.entries(labels).map(([status, label]) => ({ key: status, label, count: data[key]?.[status] ?? 0 }));
+        return <Card key={key} className="p-4"><StatusChart title={title} items={items} total={items.reduce((sum, item) => sum + item.count, 0)} colors={['bg-fm-accent-solid', 'bg-amber-400', 'bg-emerald-500', 'bg-fm-ink', 'bg-fm-slate/35', 'bg-red-500']} /></Card>;
+      })}
+    </div>
+  </div>}</Async>;
+}
+
+const TABS = ['Statistici', 'Activitate', 'Utilizatori', 'Proiecte', 'Raportări'];
 export default function Admin() {
   const [tab, setTab] = useState(0);
   return (
     <PageShell title="Administrare" subtitle="Moderare, utilizatori, proiecte și statistici." width="max-w-6xl">
-      <div className="mb-5"><Tabs items={TABS} value={tab} onChange={setTab} /></div>
-      {tab === 0 && <Stats />}{tab === 1 && <Users />}{tab === 2 && <Projects />}{tab === 3 && <Reports />}
+      <nav aria-label="Secțiuni de administrare" className="mb-5 flex flex-wrap gap-2 border border-fm-ink/10 bg-white p-2">
+        {TABS.map((label, index) => <button key={label} type="button" aria-current={tab === index ? 'page' : undefined}
+          onClick={() => setTab(index)} className={`min-h-11 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-fm-accent ${tab === index ? 'bg-fm-accent-solid text-white' : 'text-fm-ink hover:bg-fm-mist/40'}`}>{label}</button>)}
+      </nav>
+      {tab === 0 && <Stats />}{tab === 1 && <Activity />}{tab === 2 && <Users />}{tab === 3 && <Projects />}{tab === 4 && <Reports />}
     </PageShell>
   );
 }

@@ -4,7 +4,7 @@ const {
   profileUpdateSchema,
   portfolioCreateSchema,
   portfolioUpdateSchema,
-  idSchema,
+  parseId,
   parse,
 } = require('../validators/freelancers.validator');
 const trustService = require('./trust.service');
@@ -95,7 +95,7 @@ async function getMyProfile(userId, db = prisma) {
 }
 
 async function getFreelancerProfile(id, db = prisma) {
-  const freelancerId = parse(idSchema, id);
+  const freelancerId = parseId(id);
   const user = await loadFreelancer(freelancerId, db);
   if (!user || user.role !== 'FREELANCER' || user.isBlocked) {
     throw new AppError(404, 'FREELANCER_NOT_FOUND', 'Freelancerul nu a fost găsit.');
@@ -200,7 +200,7 @@ async function createPortfolioItem(userId, input, db = prisma) {
 
 // Verificarea proprietății: elementul trebuie să existe și să aparțină profilului utilizatorului curent.
 async function findOwnedPortfolioItem(itemId, userId, db) {
-  const id = parse(idSchema, itemId);
+  const id = parseId(itemId);
   const item = await db.portfolioItem.findUnique({
     where: { id },
     select: { id: true, profile: { select: { userId: true } } },

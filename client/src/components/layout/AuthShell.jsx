@@ -48,6 +48,7 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
 
   successRef.current = onSuccess;
   roleRef.current = role;
@@ -61,12 +62,18 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
     let active = true;
     let identity;
     let resizeObserver;
+    let renewTimer;
+    let popupUntil = 0;
+    let authenticating = false;
     setReady(false);
     setError('');
 
     const renderGoogleButton = (nonce) => {
       if (!active || !identity || !buttonHost.current) return;
       const host = buttonHost.current;
+      clearTimeout(renewTimer);
+      renewTimer = setTimeout(renewChallenge, 180_000);
+      popupUntil = 0;
       // Google gestionează copiii acestui container; React îl păstrează gol în JSX.
       host.innerHTML = '';
       identity.initialize({
@@ -78,7 +85,8 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
         use_fedcm_for_button: true,
         use_fedcm_for_prompt: true,
         callback: async ({ credential }) => {
-          if (!active) return;
+          if (!active || authenticating) return;
+          authenticating = true;
           setError('');
           setLoading(true);
           try {
@@ -91,11 +99,11 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
               // Provocarea are valabilitate limitată și se consumă la autentificare.
               // Reîmprospătăm butonul ca următoarea încercare să folosească una nouă.
               try {
-                const nextChallenge = await auth.googleChallenge();
-                if (active) renderGoogleButton(nextChallenge.nonce);
+                await renewChallenge(true);
               } catch { /* eroarea inițială rămâne vizibilă */ }
             }
           } finally {
+            authenticating = false;
             if (active) setLoading(false);
           }
         },
@@ -112,9 +120,24 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
         logo_alignment: 'left',
         width: Math.max(200, Math.floor(host.getBoundingClientRect().width)),
         locale: 'ro',
+        click_listener: () => { popupUntil = Date.now() + 90_000; },
       });
       setReady(true);
     };
+
+    async function renewChallenge(force = false) {
+      if (!active) return;
+      if (!force && (authenticating || Date.now() < popupUntil)) {
+        renewTimer = setTimeout(renewChallenge, 5000);
+        return;
+      }
+      try {
+        const { nonce } = await auth.googleChallenge();
+        if (active) renderGoogleButton(nonce);
+      } catch {
+        if (active) renewTimer = setTimeout(renewChallenge, 15000);
+      }
+    }
 
     async function initialize() {
       try {
@@ -136,6 +159,7 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
                 type: 'standard', theme: 'outline', size: 'large',
                 text: mode === 'register' ? 'signup_with' : 'continue_with',
                 shape: 'rectangular', logo_alignment: 'left', width, locale: 'ro',
+                click_listener: () => { popupUntil = Date.now() + 90_000; },
               });
             }
           });
@@ -149,10 +173,11 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
     initialize();
     return () => {
       active = false;
+      clearTimeout(renewTimer);
       resizeObserver?.disconnect();
       if (buttonHost.current) buttonHost.current.innerHTML = '';
     };
-  }, [disabled, googleAuth, mode]);
+  }, [disabled, googleAuth, mode, retry]);
 
   return (
     <div className={className}>
@@ -166,6 +191,7 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
       )}
       {disabled && <p id="google-register-terms-hint" className="mt-2 text-left text-xs text-fm-slate/60">Acceptă termenii și politica de confidențialitate pentru a continua cu Google.</p>}
       {error && <p role="alert" className="mt-2 text-left text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && !disabled && !loading && <button type="button" onClick={() => setRetry((value) => value + 1)} className="mt-2 text-sm font-semibold text-fm-accent underline">Reîncarcă butonul Google</button>}
     </div>
   );
 };

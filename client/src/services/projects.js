@@ -1,5 +1,5 @@
 import api, { get, post, patch, del } from './api.js';
-import { asList, asPage, clean } from '../lib/shape.js';
+import { asList, asMatch, asPage, clean } from '../lib/shape.js';
 
 export const list = (p) => get('/projects', clean({ status: 'OPEN', ...p })).then(asPage);
 export const mine = () => get('/projects/me').then(asList);
@@ -9,7 +9,7 @@ export const create = (body) => post('/projects', body).then(asEntity);
 export const update = (id, body) => patch(`/projects/${id}`, body).then(asEntity);
 export const remove = (id) => del(`/projects/${id}`);
 // { status: PENDING|RUNNING|DONE|FAILED, data: [match], analysis: { questions, assumptions, needsInfo } }
-export const matches = (id) => get(`/projects/${id}/matches`);
+export const matches = (id) => get(`/projects/${id}/matches`).then((result) => ({ ...result, data: asList(result).map(asMatch) }));
 export const uploadAttachment = async (id, file) => {
   const form = new FormData();
   form.append('image', file);

@@ -16,4 +16,5 @@ export const projects = (p) => get('/admin/projects', p).then(asPage);
 export const updateProject = (id, body) => patch(`/admin/projects/${id}`, body); // { status }
 export const removeProject = (id) => del(`/admin/projects/${id}`);
 export const reports = (p) => get('/admin/reports', p).then(asPage);
+export const activity = () => get('/admin/activity');
 export const resolveReport = (id, body) => patch(`/admin/reports/${id}`, body); // { status: RESOLVED|DISMISSED, resolution? }

@@ -41,4 +41,8 @@ async function stats(req, res) {
   res.json(await adminService.getStats());
 }
 
-module.exports = { users, updateUser, projects, updateProject, deleteProject, reports, resolveReport, stats };
+async function activity(req, res) {
+  res.json(await adminService.getActivity());
+}
+
+module.exports = { users, updateUser, projects, updateProject, deleteProject, reports, resolveReport, stats, activity };

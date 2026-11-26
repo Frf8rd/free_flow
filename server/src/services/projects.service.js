@@ -406,7 +406,7 @@ async function getProject(id, db = prisma, viewer = null) {
     include: projectInclude,
   });
   if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
-  if (project.status !== "OPEN" && project.clientId !== viewer?.id) {
+  if (project.status !== "OPEN" && project.clientId !== viewer?.id && viewer?.role !== "ADMIN") {
     if (!viewer?.id) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
     const participant = await db.engagement.findFirst({
       where: { projectId: project.id, status: { in: ["IN_PROGRESS", "DELIVERED", "COMPLETED"] }, OR: [{ clientId: viewer.id }, { freelancerId: viewer.id }] },

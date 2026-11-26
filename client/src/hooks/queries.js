@@ -152,6 +152,7 @@ export const useDeleteAccount = () => {
 
 /* ---------- admin ---------- */
 export const useAdminStats = () => useQuery({ queryKey: ['admin-stats'], queryFn: admin.stats });
+export const useAdminActivity = () => useQuery({ queryKey: ['admin-activity'], queryFn: admin.activity });
 export const useAdminUsers = (p) => useQuery({ queryKey: ['admin-users', p], queryFn: () => admin.users(p), placeholderData: keepPreviousData });
 export const useAdminProjects = (p) => useQuery({ queryKey: ['admin-projects', p], queryFn: () => admin.projects(p), placeholderData: keepPreviousData });
 export const useAdminReports = (p) => useQuery({ queryKey: ['admin-reports', p], queryFn: () => admin.reports(p), placeholderData: keepPreviousData });

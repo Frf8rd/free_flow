@@ -69,12 +69,14 @@ export default function App() {
       <Route element={<ProtectedRoute roles={['CLIENT', 'FREELANCER']} />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/recommendations" element={<Recommendations />} />
-        <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/messages/:id" element={<Messages />} />
         <Route path="/engagements" element={<Engagements />} />
         <Route path="/engagements/:id" element={<EngagementDetail />} />
         <Route path="/notifications" element={<Notifications />} />
+      </Route>
+      <Route element={<ProtectedRoute roles={['CLIENT', 'FREELANCER', 'ADMIN']} />}>
+        <Route path="/projects/:id" element={<ProjectDetail />} />
       </Route>
       <Route element={<ProtectedRoute roles={['CLIENT']} />}>
         <Route path="/projects/mine" element={<MyProjects />} />

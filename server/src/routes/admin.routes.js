@@ -20,5 +20,6 @@ router.delete("/projects/:id", adminMutationLimiter, adminController.deleteProje
 router.get("/reports", adminController.reports);
 router.patch("/reports/:id", adminMutationLimiter, adminController.resolveReport);
 router.get("/stats", adminController.stats);
+router.get("/activity", adminController.activity);
 
 module.exports = router;

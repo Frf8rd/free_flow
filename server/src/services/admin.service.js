@@ -294,6 +294,25 @@ async function getStats(db = prisma) {
   };
 }
 
+async function getActivity(db = prisma) {
+  const lastWeek = new Date(Date.now() - 7 * 86400000);
+  const [newUsers, newProjects, blockedUsers, conversations, messages, reviews, matches, matchingProjects, engagements, jobs] = await Promise.all([
+    db.user.count({ where: { createdAt: { gte: lastWeek } } }),
+    db.project.count({ where: { createdAt: { gte: lastWeek } } }),
+    db.user.count({ where: { isBlocked: true } }),
+    db.conversation.count(),
+    db.message.count(),
+    db.review.count(),
+    db.match.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.project.groupBy({ by: ["matchingStatus"], _count: { _all: true } }),
+    db.engagement.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.matchingJob.count(),
+  ]);
+  const by = (rows, key) => Object.fromEntries(rows.map((row) => [row[key], row._count._all]));
+  return { newUsers, newProjects, blockedUsers, conversations, messages, reviews, jobs,
+    matches: by(matches, "status"), matchingProjects: by(matchingProjects, "matchingStatus"), engagements: by(engagements, "status") };
+}
+
 module.exports = {
   listUsers,
   updateUser,
@@ -303,4 +322,5 @@ module.exports = {
   listReports,
   resolveReport,
   getStats,
+  getActivity,
 };

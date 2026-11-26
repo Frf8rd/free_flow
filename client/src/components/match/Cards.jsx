@@ -13,7 +13,7 @@ function Score({ value }) {
   return <div className="text-right"><p className={`text-2xl font-bold leading-none ${scoreTone(value)}`}>{value}%</p><p className="mt-1 text-[11px] text-fm-slate/60">potrivire</p></div>;
 }
 
-function Why({ items }) {
+export function Why({ items }) {
   if (!Array.isArray(items) || !items.length) return null;
   return <ul className="mt-3 space-y-1.5">{items.map((item) => {
     const label = typeof item === 'string' ? item : item?.text;
