@@ -56,7 +56,7 @@ function Form({ project }) {
   const len = f.values.description.length;
 
   return (
-    <PageShell title={project ? 'Editează proiectul' : 'Postează un proiect'} subtitle={project ? 'Dacă schimbi descrierea sau abilitățile, recalculăm potrivirile.' : 'Scrie liber ce ai nevoie. Restul detaliilor sunt opționale.'} width="max-w-4xl">
+    <>
       {project && <BackLink to={`/projects/${project.id}`}>Înapoi la proiect</BackLink>}
       <form onSubmit={onSubmit} noValidate className="grid gap-6">
         <Card className="space-y-6 p-5 sm:p-7">
@@ -95,13 +95,17 @@ function Form({ project }) {
           </div>
         </Card>
       </form>
-    </PageShell>
+    </>
   );
 }
 
 export default function ProjectForm() {
   const { id } = useParams();
   const q = useProject(id);
-  if (!id) return <Form />;
-  return <PageShell title="Editează proiectul" width="max-w-4xl"><Async q={q} skeleton={<SkeletonList n={2} />}>{(p) => <Form project={p} />}</Async></PageShell>;
+  if (!id) return <PageShell title="Postează un proiect" subtitle="Scrie liber ce ai nevoie. Restul detaliilor sunt opționale." width="max-w-4xl"><Form /></PageShell>;
+  return (
+    <PageShell title="Editează proiectul" subtitle="Dacă schimbi descrierea sau abilitățile, recalculăm potrivirile." width="max-w-4xl">
+      <Async q={q} skeleton={<SkeletonList n={2} />}>{(p) => <Form project={p} />}</Async>
+    </PageShell>
+  );
 }
