@@ -1,6 +1,30 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LogoMark } from '../ui/Logo.jsx';
 import { config } from '../../config.js';
+import * as auth from '../../services/auth.js';
+import { useAuth } from '../../store/authStore.js';
+
+let googleScriptPromise;
+function loadGoogleIdentity() {
+  if (window.google?.accounts?.id) return Promise.resolve(window.google.accounts.id);
+  if (googleScriptPromise) return googleScriptPromise;
+  googleScriptPromise = new Promise((resolve, reject) => {
+    let script = document.querySelector('script[data-google-identity]');
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleIdentity = 'true';
+      document.head.appendChild(script);
+    }
+    script.addEventListener('load', () => window.google?.accounts?.id ? resolve(window.google.accounts.id) : reject(new Error('Google nu a putut fi inițializat.')), { once: true });
+    script.addEventListener('error', () => reject(new Error('Nu s-a putut încărca autentificarea Google.')), { once: true });
+    if (window.google?.accounts?.id) resolve(window.google.accounts.id);
+  }).catch((error) => { googleScriptPromise = null; throw error; });
+  return googleScriptPromise;
+}
 
 // Formularul rămâne în centrul paginii, fără panoul de prezentare lateral.
 export default function AuthShell({ children }) {
@@ -16,17 +40,130 @@ export default function AuthShell({ children }) {
   );
 }
 
-export const GoogleButton = ({ className = '' }) => (
-  <button type="button" onClick={() => window.location.assign(config.googleAuthUrl)} className={`flex min-h-12 w-full items-center justify-center gap-3 border border-fm-graphite/15 bg-white px-4 py-3 text-sm font-semibold text-fm-ink transition hover:bg-fm-mist/40 ${className}`}>
-    <svg viewBox="0 0 24 24" className="h-5 w-5">
-      <path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 01-2.2 3.3v2.7h3.5c2.1-1.9 3.3-4.7 3.3-8z" />
-      <path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.5-2.7c-1 .7-2.2 1-3.8 1-2.9 0-5.4-2-6.3-4.6H2.1v2.8A11 11 0 0012 23z" />
-      <path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.3-.4-2s.1-1.4.4-2V7.2H2.1a11 11 0 000 9.6L5.7 14z" />
-      <path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.1-3.1A11 11 0 002.1 7.2L5.7 10c.9-2.6 3.4-4.6 6.3-4.6z" />
-    </svg>
-    Continuă cu Google
-  </button>
-);
+export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'login', disabled = false, onSuccess }) => {
+  const googleAuth = useAuth((state) => state.googleAuth);
+  const buttonHost = useRef(null);
+  const successRef = useRef(onSuccess);
+  const roleRef = useRef(role);
+  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  successRef.current = onSuccess;
+  roleRef.current = role;
+
+  useEffect(() => {
+    if (disabled) {
+      setReady(false);
+      if (buttonHost.current) buttonHost.current.innerHTML = '';
+      return undefined;
+    }
+    let active = true;
+    let identity;
+    let resizeObserver;
+    setReady(false);
+    setError('');
+
+    const renderGoogleButton = (nonce) => {
+      if (!active || !identity || !buttonHost.current) return;
+      const host = buttonHost.current;
+      // Google gestionează copiii acestui container; React îl păstrează gol în JSX.
+      host.innerHTML = '';
+      identity.initialize({
+        client_id: config.googleClientId,
+        nonce,
+        callback: async ({ credential }) => {
+          if (!active) return;
+          setError('');
+          setLoading(true);
+          try {
+            if (!credential) throw new Error('Google nu a returnat credentialul contului.');
+            const user = await googleAuth({ credential, nonce, role: roleRef.current, intent: mode === 'register' ? 'register' : 'login' });
+            await successRef.current?.(user);
+          } catch (authError) {
+            if (active) {
+              setError(authError.message || 'Autentificarea cu Google a eșuat. Încearcă din nou.');
+              // Provocarea are valabilitate limitată și se consumă la autentificare.
+              // Reîmprospătăm butonul ca următoarea încercare să folosească una nouă.
+              try {
+                const nextChallenge = await auth.googleChallenge();
+                if (active) renderGoogleButton(nextChallenge.nonce);
+              } catch { /* eroarea inițială rămâne vizibilă */ }
+            }
+          } finally {
+            if (active) setLoading(false);
+          }
+        },
+        error_callback: () => {
+          if (active) setError('Fereastra Google nu s-a deschis. Permite ferestrele popup pentru acest site și încearcă din nou.');
+        },
+      });
+      identity.renderButton(host, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: mode === 'register' ? 'signup_with' : 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+        width: Math.max(200, Math.floor(host.getBoundingClientRect().width)),
+        locale: 'ro',
+      });
+      setReady(true);
+    };
+
+    async function initialize() {
+      try {
+        if (!config.googleClientId) throw new Error('Lipsește VITE_GOOGLE_CLIENT_ID din client/.env.');
+        const [{ nonce }, googleIdentity] = await Promise.all([auth.googleChallenge(), loadGoogleIdentity()]);
+        if (!active) return;
+        identity = googleIdentity;
+        renderGoogleButton(nonce);
+        if (typeof ResizeObserver !== 'undefined' && buttonHost.current) {
+          resizeObserver = new ResizeObserver(() => {
+            const host = buttonHost.current;
+            if (!active || !identity || !host) return;
+            // Google își desenează butonul într-un iframe; îl redesenăm numai la
+            // schimbarea lățimii containerului pentru a rămâne responsive.
+            const width = Math.floor(host.getBoundingClientRect().width);
+            if (width > 0) {
+              host.innerHTML = '';
+              identity.renderButton(host, {
+                type: 'standard', theme: 'outline', size: 'large',
+                text: mode === 'register' ? 'signup_with' : 'continue_with',
+                shape: 'rectangular', logo_alignment: 'left', width, locale: 'ro',
+              });
+            }
+          });
+          resizeObserver.observe(buttonHost.current);
+        }
+      } catch (initError) {
+        if (active) setError(initError.message || 'Nu s-a putut încărca autentificarea Google.');
+      }
+    }
+
+    initialize();
+    return () => {
+      active = false;
+      resizeObserver?.disconnect();
+      if (buttonHost.current) buttonHost.current.innerHTML = '';
+    };
+  }, [disabled, googleAuth, mode]);
+
+  return (
+    <div className={className}>
+      {disabled ? (
+        <button type="button" disabled className="flex min-h-12 w-full items-center justify-center border border-fm-graphite/15 bg-white px-4 py-3 text-sm font-semibold text-fm-ink opacity-60" aria-describedby="google-register-terms-hint">Continuă cu Google</button>
+      ) : (
+        <>
+          <div ref={buttonHost} className="min-h-12 w-full" aria-label={mode === 'register' ? 'Înregistrare cu Google' : 'Autentificare cu Google'} />
+          {!ready && <p role="status" className="mt-2 text-sm text-fm-slate/60">{loading ? 'Se conectează…' : 'Se încarcă Google…'}</p>}
+        </>
+      )}
+      {disabled && <p id="google-register-terms-hint" className="mt-2 text-left text-xs text-fm-slate/60">Acceptă termenii și politica de confidențialitate pentru a continua cu Google.</p>}
+      {error && <p role="alert" className="mt-2 text-left text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+};
 
 export const Divider = () => (
   <div className="my-6 flex items-center gap-4 text-xs text-fm-slate/50"><span className="h-px flex-1 bg-fm-graphite/10" /> sau <span className="h-px flex-1 bg-fm-graphite/10" /></div>

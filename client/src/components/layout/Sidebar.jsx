@@ -8,6 +8,7 @@ import { useChat } from '../../lib/chat.jsx';
 import { useAuth } from '../../store/authStore.js';
 import { useCounts } from '../../hooks/queries.js';
 import { visibleNav, navLabel, quickActions } from '../../lib/navigation.js';
+import ModeSwitch from './ModeSwitch.jsx';
 
 const itemBase = 'group relative flex min-h-10 items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white';
 const itemActive = 'bg-white/10 text-white ring-1 ring-white/10';
@@ -181,6 +182,7 @@ export default function SidebarContent({ collapsed = false, mobile = false, onTo
 
       {/* Zona de mijloc — fără bară de derulare */}
       <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto no-scrollbar px-4 pb-3 pt-4 [&>*]:shrink-0 ${collapsed ? 'items-center px-3' : ''}`}>
+        <ModeSwitch collapsed={collapsed} />
         <QuickActions collapsed={collapsed} onNavigate={onClose} />
 
         <nav aria-label="Navigare aplicație" className={`flex flex-col gap-1 ${collapsed ? 'items-center' : 'w-full'}`}>

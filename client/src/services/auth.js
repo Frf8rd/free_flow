@@ -3,6 +3,8 @@ import { get, post, patch } from './api.js';
 const unwrapUser = (data) => data?.user || data?.data?.user || data?.data || data;
 export const login = (data) => post('/auth/login', data);
 export const register = (data) => post('/auth/register', data);
+export const googleChallenge = () => post('/auth/oauth/google/challenge', {});
+export const googleLogin = (data) => post('/auth/oauth/google', data);
 export const me = async () => unwrapUser(await get('/auth/me'));
 export const logout = () => post('/auth/logout', {});
 export const updateAccount = async (body) => unwrapUser(await patch('/users/me', body));

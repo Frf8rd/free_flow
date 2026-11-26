@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute, { GuestRoute } from './components/layout/ProtectedRoute.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
 
 const Landing = lazy(() => import('./pages/Landing.jsx'));
-const Login = lazy(() => import('./pages/Login.jsx'));
-const Register = lazy(() => import('./pages/Register.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Recommendations = lazy(() => import('./pages/Recommendations.jsx'));
 const MyProjects = lazy(() => import('./pages/MyProjects.jsx'));

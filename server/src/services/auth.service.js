@@ -257,6 +257,10 @@ async function loginWithProvider(provider, input) {
   if (!["CLIENT", "FREELANCER"].includes(input.role)) {
     throw new AppError(400, "VALIDATION_ERROR", "Rolul trebuie să fie CLIENT sau FREELANCER.");
   }
+  const intent = input.intent ?? "login";
+  if (!["login", "register"].includes(intent)) {
+    throw new AppError(400, "VALIDATION_ERROR", "Tipul autentificării este invalid.");
+  }
 
   const config = getProvider(provider);
   const claims = await verifyProviderCredential(provider, input.credential, input.nonce);
@@ -312,10 +316,17 @@ async function loginWithProvider(provider, input) {
 
       const existingUser = await tx.user.findUnique({ where: { email } });
       if (existingUser) {
+        if (intent === "register") {
+          throw new AppError(409, "ACCOUNT_ALREADY_EXISTS", "Există deja un cont cu acest email. Autentifică-te în schimb.");
+        }
         if (provider === "google") {
           return linkGoogleAccountToExistingAdmin(tx, existingUser, claims.sub);
         }
         throw new AppError(409, "ACCOUNT_LINK_REQUIRED", "Există deja un cont cu acest email.");
+      }
+
+      if (intent === "login") {
+        throw new AppError(404, "ACCOUNT_NOT_FOUND", "Nu există încă un cont cu acest Google. Înregistrează-te mai întâi.");
       }
 
       const user = await tx.user.create({

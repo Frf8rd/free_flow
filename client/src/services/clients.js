@@ -1,3 +1,4 @@
 import { get, put } from './api.js';
-export const mine = () => get('/clients/me');
-export const saveMine = (body) => put('/clients/me', body);
+const unwrap = (response) => response?.data ?? response;
+export const mine = () => get('/clients/me').then(unwrap);
+export const saveMine = (body) => put('/clients/me', body).then(unwrap);

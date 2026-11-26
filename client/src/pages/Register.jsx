@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import AuthShell from '../components/layout/AuthShell.jsx';
+import AuthShell, { Divider, GoogleButton } from '../components/layout/AuthShell.jsx';
 import Input, { MailIcon, LockIcon, UserIcon } from '../components/ui/Input.jsx';
 import Button from '../components/ui/Button.jsx';
 import { useAuth } from '../store/authStore.js';
@@ -36,6 +36,10 @@ export default function Register() {
   }
   const go = () => navigate('/onboarding');
 
+  function onGoogleSuccess(user) {
+    navigate(user.role === 'ADMIN' ? '/admin' : user.onboarded === false ? '/onboarding' : '/dashboard', { replace: true });
+  }
+
   async function onSubmit(ev) {
     ev.preventDefault();
     setServerError('');
@@ -63,6 +67,13 @@ export default function Register() {
           <legend className="mb-2 text-sm font-medium text-fm-ink">Vreau să mă înscriu ca</legend>
           {[["CLIENT", "Client"], ["FREELANCER", "Freelancer"]].map(([role, label]) => <button key={role} type="button" role="radio" aria-checked={form.role === role} onClick={() => setForm({ ...form, role })} className={`border px-3 py-3 text-sm font-semibold transition ${form.role === role ? 'border-fm-ink bg-fm-mist/70 text-fm-ink' : 'border-fm-graphite/20 text-fm-slate hover:bg-fm-mist/40'}`}>{label}</button>)}
         </fieldset>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-fm-slate/80">
+          <input type="checkbox" checked={terms} onChange={(e) => { setTerms(e.target.checked); setErrors({ ...errors, terms: '' }); }} className="mt-0.5 h-4 w-4 accent-fm-ink" />
+          <span>Accept <Link to="/legal?kind=terms" className="font-semibold text-fm-graphite hover:underline">Termenii</Link> și <Link to="/legal?kind=privacy" className="font-semibold text-fm-graphite hover:underline">Politica de confidențialitate</Link>.</span>
+        </label>
+        {errors.terms && <p className="-mt-2 text-xs text-red-500">{errors.terms}</p>}
+        <GoogleButton role={form.role} mode="register" disabled={!terms} onSuccess={onGoogleSuccess} />
+        <Divider />
         <Input placeholder="Nume complet" icon={UserIcon} value={form.name} onChange={set('name')} error={errors.name} autoComplete="name" />
         <Input type="email" placeholder="Email" icon={MailIcon} value={form.email} onChange={set('email')} error={errors.email} autoComplete="email" />
         <div>
@@ -73,11 +84,6 @@ export default function Register() {
               <p className="mt-1 text-xs text-fm-slate/60">Parolă: {labels[s]}</p>
             </div>)}
         </div>
-        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-fm-slate/80">
-          <input type="checkbox" checked={terms} onChange={(e) => { setTerms(e.target.checked); setErrors({ ...errors, terms: '' }); }} className="mt-0.5 h-4 w-4 accent-fm-ink" />
-          <span>Accept <Link to="/legal?kind=terms" className="font-semibold text-fm-graphite hover:underline">Termenii</Link> și <Link to="/legal?kind=privacy" className="font-semibold text-fm-graphite hover:underline">Politica de confidențialitate</Link>.</span>
-        </label>
-        {errors.terms && <p className="-mt-2 text-xs text-red-500">{errors.terms}</p>}
         {serverError && (
           <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
             {serverError}

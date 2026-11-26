@@ -32,12 +32,17 @@ export function SessionProvider({ children }) {
 
   const mode = authUser?.role === 'CLIENT' || authUser?.role === 'FREELANCER' ? authUser.role : modeOverride;
   const setMode = useCallback(async (m) => {
-    if (!['CLIENT', 'FREELANCER'].includes(m)) return;
+    if (!['CLIENT', 'FREELANCER'].includes(m)) return null;
     if (authUser) {
-      const updated = await useAuth.getState().updateAccount({ role: m });
+      await useAuth.getState().updateAccount({ role: m });
+      const updated = await useAuth.getState().reload();
       setModeState(updated.role || m);
-    } else setModeState(m);
+      write('fm-mode', updated.role || m);
+      return updated;
+    }
+    setModeState(m);
     write('fm-mode', m);
+    return null;
   }, [authUser]);
   const setTheme = useCallback((t) => { setThemeState(t); write('fm-theme', t); }, []);
   const updateUser = useCallback((changes) => {

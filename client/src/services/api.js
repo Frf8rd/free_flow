@@ -27,6 +27,7 @@ export async function refreshSession() {
         const session = data?.data || data;
         if (!session?.accessToken) throw new Error('Sesiunea nu a putut fi reînnoită.');
         tokens.setAccess(session.accessToken);
+        tokens.markSessionPresent();
         if (session.refreshToken) tokens.setRefresh(session.refreshToken);
         return session;
       })

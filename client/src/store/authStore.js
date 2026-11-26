@@ -24,6 +24,7 @@ export const useAuth = create((set, get) => ({
   setSession({ user, accessToken, refreshToken }) {
     tokens.setAccess(accessToken);
     if (refreshToken) tokens.setRefresh(refreshToken);
+    tokens.markSessionPresent();
     queryClient.clear();
     set({ user, status: 'authed' });
   },
@@ -42,6 +43,14 @@ export const useAuth = create((set, get) => ({
     get().setSession(d);
     set({ user: await auth.me().catch(() => d.user) });
     track('register', { role: form.role });
+    return get().user;
+  },
+
+  async googleAuth({ credential, nonce, role, intent = 'login' }) {
+    const d = await auth.googleLogin({ credential, nonce, role, intent });
+    get().setSession(d);
+    set({ user: await auth.me() });
+    track(intent, { role: get().user.role, provider: 'google' });
     return get().user;
   },
 

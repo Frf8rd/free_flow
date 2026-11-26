@@ -34,12 +34,16 @@ export default function Login() {
     }
   }
 
+  function onGoogleSuccess(user) {
+    navigate(location.state?.from || (user.role === 'ADMIN' ? '/admin' : user.onboarded === false ? '/onboarding' : '/dashboard'), { replace: true });
+  }
+
   return (
     <AuthShell>
       <h1 className="text-2xl font-bold tracking-tight text-fm-ink">Bine ai revenit!</h1>
       <p className="mt-2 text-sm text-fm-slate/70">Conectează-te pentru a continua în FairMatch.</p>
 
-      <div className="mt-6"><GoogleButton /><Divider /></div>
+      <div className="mt-6"><GoogleButton role="FREELANCER" onSuccess={onGoogleSuccess} /><Divider /></div>
 
       <form onSubmit={onSubmit} className="space-y-4 text-left" noValidate>
         <Input label="Email" type="email" placeholder="nume@exemplu.md" icon={MailIcon} value={form.email} onChange={set('email')} error={errors.email} autoComplete="email" />

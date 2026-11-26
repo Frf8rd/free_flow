@@ -143,11 +143,13 @@ async function updateMyProfile(userId, input, db = prisma) {
         ...fields,
         ...(skillWrites ? { skills: { deleteMany: {}, create: skillWrites } } : {}),
       },
-      select: { id: true, title: true, hourlyRate: true, skills: { select: { skillId: true } } },
+      select: { id: true, title: true, bio: true, hourlyRate: true, skills: { select: { skillId: true } } },
     }),
   );
 
-  const complete = Boolean(saved.title?.trim() && saved.skills.length > 0 && saved.hourlyRate !== null);
+  // Tariful este opțional („La cerere”); nu bloca accesul dacă freelancerul
+  // și-a completat descrierea și abilitățile, dar preferă să stabilească tariful ulterior.
+  const complete = Boolean(saved.title?.trim().length >= 3 && saved.bio?.trim().length >= 30 && saved.skills.length > 0);
   await db.freelancerProfile.update({ where: { id: saved.id }, data: { onboarded: complete } });
 
   if (db === prisma) await enqueueMatchingJob('FREELANCER', userId, db);

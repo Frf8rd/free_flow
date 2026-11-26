@@ -3,7 +3,7 @@ const apiUrl = env.VITE_API_URL || 'http://localhost:4000/api';
 
 export const config = {
   apiUrl,
-  googleAuthUrl: env.VITE_GOOGLE_AUTH_URL || `${apiUrl.replace(/\/$/, '')}/auth/google`,
+  googleClientId: env.VITE_GOOGLE_CLIENT_ID || '',
   useMock: env.VITE_USE_MOCK === 'true',
   currency: env.VITE_CURRENCY || 'EUR',
   locale: env.VITE_LOCALE || 'ro-RO',
