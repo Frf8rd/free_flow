@@ -4,6 +4,7 @@ const { AppError } = require("../utils/errors");
 const {
   listUsers,
   updateUser,
+  updateProject,
   deleteProject,
   listReports,
   resolveReport,
@@ -133,11 +134,25 @@ test("getStats aggregates totals and group counts", async () => {
     user: { count: async () => 5, groupBy: async () => [{ role: "CLIENT", _count: { _all: 3 } }, { role: "FREELANCER", _count: { _all: 2 } }] },
     project: { count: async () => 4, groupBy: async () => [{ status: "OPEN", _count: { _all: 4 } }] },
     report: { count: async () => 1, groupBy: async () => [{ status: "OPEN", _count: { _all: 1 } }] },
+    engagement: { count: async () => 2 },
   };
   assert.deepEqual(await getStats(db), {
-    totals: { users: 5, projects: 4, reports: 1 },
+    totals: { users: 5, projects: 4, reports: 1, engagements: 2 },
     usersByRole: { CLIENT: 3, FREELANCER: 2 },
     projectsByStatus: { OPEN: 4 },
     reportsByStatus: { OPEN: 1 },
   });
+});
+test("updateProject validates status and updates existing projects", async () => {
+  let update;
+  const make = (found) => ({
+    project: { findUnique: async () => found, update: async (args) => { update = args; return { id: "p1" }; } },
+  });
+  for (const input of [null, [], {}, { status: "DONE" }, { status: "OPEN", title: "x" }]) {
+    await expectAppError(updateProject("p1", input, make({ id: "p1" })), 400, "VALIDATION_ERROR");
+  }
+  await expectAppError(updateProject(" ", { status: "CLOSED" }, make(null)), 400, "VALIDATION_ERROR");
+  await expectAppError(updateProject("p1", { status: "CLOSED" }, make(null)), 404, "PROJECT_NOT_FOUND");
+  await updateProject("p1", { status: "CLOSED" }, make({ id: "p1" }));
+  assert.equal(update.data.status, "CLOSED");
 });

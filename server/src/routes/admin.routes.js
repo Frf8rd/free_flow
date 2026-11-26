@@ -15,6 +15,7 @@ router.use(authenticate, requireRole("ADMIN"));
 router.get("/users", adminController.users);
 router.patch("/users/:id", adminMutationLimiter, adminController.updateUser);
 router.get("/projects", adminController.projects);
+router.patch("/projects/:id", adminMutationLimiter, adminController.updateProject);
 router.delete("/projects/:id", adminMutationLimiter, adminController.deleteProject);
 router.get("/reports", adminController.reports);
 router.patch("/reports/:id", adminMutationLimiter, adminController.resolveReport);

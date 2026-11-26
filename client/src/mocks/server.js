@@ -23,7 +23,7 @@ const skillById = (id) => db.skills.find((s) => s.id === id);
 const catById = (id) => db.categories.find((c) => c.id === id);
 
 const onboarded = (u) => (u.role === 'FREELANCER' ? !!FPofUser(u.id)?.onboarded : u.role === 'CLIENT' ? !!CP(u.id) : true);
-const userDto = (u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl, isBlocked: u.isBlocked, onboarded: onboarded(u), createdAt: u.createdAt });
+const userDto = (u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl, dashboardBackgroundUrl: u.dashboardBackgroundUrl || null, isBlocked: u.isBlocked, onboarded: onboarded(u), createdAt: u.createdAt });
 
 const reviewsOf = (f) => db.engagements.flatMap((e) => (e.reviews || []).filter((r) => r.targetUserId === f.userId).map((r) => ({ ...r, author: { name: U(r.authorId)?.name || 'Client' }, projectTitle: PR(e.projectId)?.title })));
 const rating = (f) => { const r = reviewsOf(f); return { ratingAvg: r.length ? +(r.reduce((s, x) => s + x.rating, 0) / r.length).toFixed(1) : null, reviewsCount: r.length }; };
@@ -178,7 +178,7 @@ r('PATCH', '/users/me', ({ me, body }) => {
     me.role = body.role;
     if (me.role === 'FREELANCER' && !FPofUser(me.id)) db.freelancers.push({ id: uid('f'), userId: me.id, title: '', bio: '', level: 'BEGINNER', availability: 'AVAILABLE', languages: [], skillIds: [], portfolio: [], onboarded: false, completedCount: 0, createdAt: nowIso() });
   }
-  ['name', 'email', 'avatarUrl'].forEach((k) => { if (body[k] !== undefined) me[k] = body[k]; });
+  ['name', 'email', 'avatarUrl', 'dashboardBackgroundUrl'].forEach((k) => { if (body[k] !== undefined) me[k] = body[k]; });
   return { user: userDto(me) };
 });
 r('DELETE', '/users/me', ({ me, body }) => {
@@ -378,7 +378,7 @@ r('PATCH', '/notifications/:id/read', ({ me, params }) => { need(me); const n = 
 // reports + uploads
 r('POST', '/reports', ({ me, body }) => {
   need(me); if (!['USER', 'PROJECT', 'MESSAGE'].includes(body.targetType)) throw bad('Tip de raportare invalid.'); if (!body.reason || body.reason.length < 10) throw bad('Datele introduse nu sunt valide.', { reason: 'Descrie problema în cel puțin 10 caractere.' });
-  db.reports.unshift({ id: uid('rp'), reporterId: me.id, targetType: body.targetType, targetId: body.targetId, reason: body.reason, resolved: false, createdAt: nowIso() }); return [201, { ok: true }];
+  db.reports.unshift({ id: uid('rp'), reporterId: me.id, targetType: body.targetType, targetId: body.targetId, reason: body.reason, status: 'OPEN', createdAt: nowIso() }); return [201, { ok: true }];
 });
 r('POST', '/uploads', async ({ me, body }) => {
   need(me); const file = body?.get?.('file'); if (!file) throw bad('Nu am primit niciun fișier.');
@@ -387,13 +387,14 @@ r('POST', '/uploads', async ({ me, body }) => {
 });
 
 // admin
-r('GET', '/admin/stats', ({ me }) => { need(me, 'ADMIN'); return { users: db.users.length, freelancers: db.freelancers.filter((f) => f.onboarded).length, clients: db.users.filter((u) => u.role === 'CLIENT').length, projects: db.projects.length, openProjects: db.projects.filter((p) => p.status === 'OPEN').length, engagements: db.engagements.length, openReports: db.reports.filter((x) => !x.resolved).length }; });
-r('GET', '/admin/users', ({ me, query }) => { need(me, 'ADMIN'); const q = (query.q || '').toLowerCase(); return paginate(db.users.filter((u) => !q || `${u.name} ${u.email}`.toLowerCase().includes(q)).map(userDto), query); });
-r('PATCH', '/admin/users/:id', ({ me, params, body }) => { need(me, 'ADMIN'); const u = U(params.id); if (!u) throw notFound(); if (u.id === me.id) throw forbidden('Nu îți poți modifica propriul cont de aici.'); if (body.isBlocked !== undefined) u.isBlocked = !!body.isBlocked; if (body.role) u.role = body.role; return userDto(u); });
-r('GET', '/admin/projects', ({ me, query }) => { need(me, 'ADMIN'); return paginate(db.projects.map((p) => projectDto(p, me)), query); });
+r('GET', '/admin/stats', ({ me }) => { need(me, 'ADMIN'); const by = (arr, k) => arr.reduce((o, x) => ({ ...o, [x[k]]: (o[x[k]] || 0) + 1 }), {}); return { totals: { users: db.users.length, projects: db.projects.length, reports: db.reports.length, engagements: db.engagements.length }, usersByRole: by(db.users, 'role'), projectsByStatus: by(db.projects, 'status'), reportsByStatus: by(db.reports, 'status') }; });
+r('GET', '/admin/users', ({ me, query }) => { need(me, 'ADMIN'); const q = (query.search || '').toLowerCase(); return paginate(db.users.filter((u) => (!q || `${u.name} ${u.email}`.toLowerCase().includes(q)) && (!query.role || u.role === query.role) && (!query.blocked || String(!!u.isBlocked) === query.blocked)).map(userDto), query); });
+r('PATCH', '/admin/users/:id', ({ me, params, body }) => { need(me, 'ADMIN'); const u = U(params.id); if (!u) throw notFound(); if (u.id === me.id) throw forbidden('Nu îți poți modifica propriul cont de aici.'); if (body.isBlocked !== undefined) u.isBlocked = !!body.isBlocked; if (body.role) u.role = body.role; return { data: userDto(u) }; });
+r('GET', '/admin/projects', ({ me, query }) => { need(me, 'ADMIN'); const q = (query.search || '').toLowerCase(); return paginate(db.projects.filter((p) => (!q || `${p.title} ${p.description || ''}`.toLowerCase().includes(q)) && (!query.status || p.status === query.status)).map((p) => projectDto(p, me)), query); });
+r('PATCH', '/admin/projects/:id', ({ me, params, body }) => { need(me, 'ADMIN'); const p = db.projects.find((x) => x.id === params.id); if (!p) throw notFound(); if (body.status) p.status = body.status; return { data: projectDto(p, me) }; });
 r('DELETE', '/admin/projects/:id', ({ me, params }) => { need(me, 'ADMIN'); db.projects = db.projects.filter((p) => p.id !== params.id); return [204, null]; });
-r('GET', '/admin/reports', ({ me, query }) => { need(me, 'ADMIN'); return paginate(db.reports.map((x) => ({ ...x, reporter: { name: U(x.reporterId)?.name || '—' } })), query); });
-r('PATCH', '/admin/reports/:id', ({ me, params }) => { need(me, 'ADMIN'); const x = db.reports.find((q) => q.id === params.id); if (!x) throw notFound(); x.resolved = true; return x; });
+r('GET', '/admin/reports', ({ me, query }) => { need(me, 'ADMIN'); return paginate(db.reports.filter((x) => !query.status || (x.status || 'OPEN') === query.status).map((x) => ({ ...x, status: x.status || 'OPEN', reporter: { name: U(x.reporterId)?.name || '—' }, target: { id: x.targetId, exists: true, label: x.targetType === 'USER' ? (U(x.targetId)?.name || x.targetId) : (db.projects.find((p) => p.id === x.targetId)?.title || x.targetId) } })), query); });
+r('PATCH', '/admin/reports/:id', ({ me, params, body }) => { need(me, 'ADMIN'); const x = db.reports.find((q) => q.id === params.id); if (!x) throw notFound(); x.status = body.status; x.resolution = body.resolution || null; return { data: x }; });
 
 export async function handle(config) {
   const method = (config.method || 'get').toUpperCase();

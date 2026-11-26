@@ -8,6 +8,7 @@ const userSelect = {
   name: true,
   role: true,
   avatarUrl: true,
+  dashboardBackgroundUrl: true,
   emailVerifiedAt: true,
 };
 
@@ -90,12 +91,16 @@ async function updateMe(currentUser, input, { db = prisma, ...overrides } = {}) 
   const data = {};
   if (profile.name !== undefined) data.name = profile.name;
   if (profile.avatarUrl !== undefined) data.avatarUrl = profile.avatarUrl;
+  if (profile.dashboardBackgroundUrl !== undefined) data.dashboardBackgroundUrl = profile.dashboardBackgroundUrl;
 
   if (email !== undefined && email !== currentUser.email) {
     return changeEmail(currentUser, { ...data, email, ...(role ? { role } : {}) }, { password, credential, nonce }, db, deps);
   }
 
   if (role !== undefined && role !== currentUser.role) {
+    if (currentUser.role === "ADMIN") {
+      throw new AppError(403, "FORBIDDEN", "Rolul unui cont de administrator se schimbă numai din panoul de administrare.");
+    }
     const updated = await db.$transaction(async (tx) => {
       const user = await tx.user.update({ where: { id: currentUser.id }, data: { ...data, role }, select: userSelect });
       if (role === "CLIENT") await tx.clientProfile.upsert({ where: { userId: currentUser.id }, create: { userId: currentUser.id }, update: {} });

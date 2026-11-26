@@ -27,6 +27,10 @@ function projectForScoring(project, extracted) {
   };
 }
 
+function getUserSelectedSkills(projectSkills = []) {
+  return projectSkills.filter(({ source }) => source === 'USER').map(({ skill }) => skill);
+}
+
 function toScoringFreelancer(profile, review = { count: 0, avg: null }, exposure = {}) {
   return {
     id: profile.id,
@@ -94,6 +98,13 @@ async function persistProjectMatches(projectId, ranked, db, side = 'CLIENT') {
       update: data,
     });
   }
+  await db.match.deleteMany({
+    where: {
+      projectId,
+      status: 'SUGGESTED',
+      ...(ids.length ? { freelancerId: { notIn: ids } } : {}),
+    },
+  });
 }
 
 async function loadProject(projectId, db) {
@@ -117,7 +128,7 @@ async function matchFreelancersForProject(projectId, db = prisma) {
 
   try {
     const catalog = await db.skill.findMany({ select: { id: true, name: true, categoryId: true } });
-    const explicit = project.skills.map(({ skill }) => skill);
+    const explicit = getUserSelectedSkills(project.skills);
     const extracted = await extractProjectDataWithAI({
       ...project,
       skills: explicit.map((skill) => ({ ...skill, essential: true })),
@@ -271,8 +282,19 @@ async function matchProjectsForFreelancer(userId, db = prisma) {
       },
     });
   }
+  const rankedProjectIds = ranked.map(({ project }) => project.id);
+  await db.match.deleteMany({
+    where: {
+      freelancerId: profile.id,
+      status: 'SUGGESTED',
+      projectId: {
+        in: projects.map(({ id }) => id),
+        ...(rankedProjectIds.length ? { notIn: rankedProjectIds } : {}),
+      },
+    },
+  });
   await db.freelancerProfile.update({ where: { id: profile.id }, data: { matchedAt: new Date() } });
   return ranked;
 }
 
-module.exports = { matchFreelancersForProject, matchProjectsForFreelancer, projectForScoring, toScoringFreelancer, ACTIVE_MATCH_STATUSES };
+module.exports = { matchFreelancersForProject, matchProjectsForFreelancer, persistProjectMatches, projectForScoring, getUserSelectedSkills, toScoringFreelancer, ACTIVE_MATCH_STATUSES };

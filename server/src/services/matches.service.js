@@ -26,10 +26,25 @@ async function listMine(user, query = {}, db = prisma) {
 }
 
 async function listForProject(user, projectId, db = prisma) {
-  const project = await db.project.findUnique({ where: { id: projectId }, select: { id: true, clientId: true } });
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, clientId: true, matchingStatus: true, matchingError: true, extracted: true },
+  });
   if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
   if (project.clientId !== user.id) throw new AppError(403, 'FORBIDDEN', 'Poți vedea potrivirile doar pentru proiectele tale.');
-  return db.match.findMany({ where: { projectId }, include: matchInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
+  const data = await db.match.findMany({ where: { projectId }, include: matchInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
+  const extracted = project.extracted && typeof project.extracted === 'object' ? project.extracted : {};
+  return {
+    status: project.matchingStatus || 'PENDING',
+    error: project.matchingError || null,
+    data,
+    analysis: {
+      source: extracted.source || null,
+      needsInfo: Boolean(extracted.needsInfo),
+      questions: Array.isArray(extracted.clarifyingQuestions) ? extracted.clarifyingQuestions : [],
+      assumptions: Array.isArray(extracted.assumptions) ? extracted.assumptions : [],
+    },
+  };
 }
 
 async function getOwnedMatch(user, id, db) {

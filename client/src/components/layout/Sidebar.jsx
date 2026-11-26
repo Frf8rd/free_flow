@@ -9,6 +9,7 @@ import { useAuth } from '../../store/authStore.js';
 import { useCounts } from '../../hooks/queries.js';
 import { visibleNav, navLabel, quickActions } from '../../lib/navigation.js';
 import ModeSwitch from './ModeSwitch.jsx';
+import { preloadPath } from '../../lib/routes.js';
 
 const itemBase = 'group relative flex min-h-10 items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white';
 const itemActive = 'bg-white/10 text-white ring-1 ring-white/10';
@@ -53,8 +54,10 @@ function ProfileRow({ collapsed, mobile, onNavigate }) {
 function QuickActions({ collapsed, onNavigate }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { mode } = useSession();
+  const { mode, user } = useSession();
   const actions = quickActions(mode);
+
+  if (user.isAdmin) return null;
 
   if (collapsed) {
     return (
@@ -129,7 +132,7 @@ function NavRow({ item, collapsed, onNavigate }) {
           <ul className={`ml-[25px] min-h-0 overflow-hidden ${groupOpen ? 'border-l border-white/10 pl-3' : ''}`}>
             {item.children.map((c) => (
               <li key={c.to} className="pt-1">
-                <NavLink to={c.to} onClick={onNavigate} tabIndex={groupOpen ? 0 : -1} className={({ isActive }) => `${itemBase} min-h-9 py-2 ${isActive ? itemActive : ''}`}>{c.label}</NavLink>
+                <NavLink to={c.to} onClick={onNavigate} onMouseEnter={() => preloadPath(c.to)} onFocus={() => preloadPath(c.to)} tabIndex={groupOpen ? 0 : -1} className={({ isActive }) => `${itemBase} min-h-9 py-2 ${isActive ? itemActive : ''}`}>{c.label}</NavLink>
               </li>
             ))}
           </ul>
@@ -142,6 +145,8 @@ function NavRow({ item, collapsed, onNavigate }) {
     <NavLink
       to={item.to}
       onClick={onNavigate}
+      onMouseEnter={() => preloadPath(item.to)}
+      onFocus={() => preloadPath(item.to)}
       title={collapsed ? (count ? `${label} (${count})` : label) : undefined}
       aria-label={collapsed ? label : undefined}
       className={({ isActive }) => `${itemBase} ${collapsed ? 'mx-auto h-11 w-11 justify-center p-0' : 'w-full'} ${isActive ? itemActive : ''}`}
@@ -182,7 +187,7 @@ export default function SidebarContent({ collapsed = false, mobile = false, onTo
 
       {/* Zona de mijloc — fără bară de derulare */}
       <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto no-scrollbar px-4 pb-3 pt-4 [&>*]:shrink-0 ${collapsed ? 'items-center px-3' : ''}`}>
-        <ModeSwitch collapsed={collapsed} />
+        {!user.isAdmin && <ModeSwitch collapsed={collapsed} />}
         <QuickActions collapsed={collapsed} onNavigate={onClose} />
 
         <nav aria-label="Navigare aplicație" className={`flex flex-col gap-1 ${collapsed ? 'items-center' : 'w-full'}`}>

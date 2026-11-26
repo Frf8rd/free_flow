@@ -14,8 +14,9 @@ export const navItems = [
   { key: 'settings', label: 'Setări', icon: 'settings', to: '/settings' },
 ];
 
-export const visibleNav = (mode, isAdmin) => navItems.filter((i) =>
-  (!i.admin || isAdmin) && !(mode === 'FREELANCER' && i.key === 'projects'));
+export const visibleNav = (mode, isAdmin) => isAdmin
+  ? navItems.filter((item) => ['admin', 'settings'].includes(item.key))
+  : navItems.filter((i) => !i.admin && !(mode === 'FREELANCER' && i.key === 'projects'));
 export const navLabel = (item) => (typeof item.label === 'function' ? item.label('CLIENT') : item.label);
 
 export const quickActions = (mode) => mode === 'CLIENT' ? [

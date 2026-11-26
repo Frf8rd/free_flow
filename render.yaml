@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: fairmatch-api
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm ci
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDMERSIVE_API_KEY
+        sync: false
+      - key: MATCH_LLM_API_KEY
+        sync: false
+      - key: MATCH_LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: MATCH_LLM_MODEL
+        value: gemini-3.8-flash
+      - key: MATCH_LLM_ENABLED
+        value: "true"
+      - key: MATCH_EMBED_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: MATCH_EMBED_MODEL
+        value: gemini-embedding-001
+      - key: MATCH_EMBED_DIMENSIONS
+        value: "256"
+      - key: MATCH_EMBED_ENABLED
+        value: "true"

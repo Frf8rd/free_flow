@@ -107,19 +107,22 @@ export const useReadAllNotifications = () => useInvalidating(notifications.readA
 
 // Numerele din bară (notificări, mesaje, potriviri noi): o interogare ușoară, reînnoită periodic
 export function useCounts() {
+  const qc = useQueryClient();
   const user = useAuth((s) => s.user);
-  const enabled = !!user && user.onboarded !== false;
+  const enabled = !!user && user.role !== 'ADMIN' && user.onboarded !== false;
   return useQuery({
     queryKey: ['counts', user?.id],
     enabled,
     refetchInterval: config.pollCountsMs,
     staleTime: 15_000,
     queryFn: async () => {
-      const [n, c, m] = await Promise.all([
+      const [n, m] = await Promise.all([
         notifications.list({ unread: true, limit: 1 }).catch(() => null),
-        conversations.list().catch(() => []),
         user.role === 'ADMIN' ? null : matches.mine({ status: 'new', limit: 1 }).catch(() => null),
       ]);
+      // ChatProvider already refreshes this shared query. Read its cache instead
+      // of issuing a second conversations request on every count refresh.
+      const c = qc.getQueryData(['conversations']) || [];
       return { notifications: n?.total ?? 0, messages: c.reduce((s, x) => s + (x.unreadCount || 0), 0), matches: m?.total ?? 0 };
     },
     placeholderData: { notifications: 0, messages: 0, matches: 0 },
@@ -143,5 +146,6 @@ export const useAdminUsers = (p) => useQuery({ queryKey: ['admin-users', p], que
 export const useAdminProjects = (p) => useQuery({ queryKey: ['admin-projects', p], queryFn: () => admin.projects(p), placeholderData: keepPreviousData });
 export const useAdminReports = (p) => useQuery({ queryKey: ['admin-reports', p], queryFn: () => admin.reports(p), placeholderData: keepPreviousData });
 export const useAdminUpdateUser = () => useInvalidating(({ id, ...b }) => admin.updateUser(id, b), [['admin-users'], ['admin-stats']]);
+export const useAdminUpdateProject = () => useInvalidating(({ id, ...b }) => admin.updateProject(id, b), [['admin-projects'], ['admin-stats'], ['projects'], ['project']]);
 export const useAdminRemoveProject = () => useInvalidating(admin.removeProject, [['admin-projects'], ['admin-stats']]);
-export const useAdminResolveReport = () => useInvalidating(admin.resolveReport, [['admin-reports'], ['admin-stats']]);
+export const useAdminResolveReport = () => useInvalidating(({ id, ...b }) => admin.resolveReport(id, b), [['admin-reports'], ['admin-stats']]);

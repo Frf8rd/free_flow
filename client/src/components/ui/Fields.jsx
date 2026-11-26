@@ -10,8 +10,11 @@ export const Field = ({ label, hint, error, className = '', children }) => (
     {error ? <span className="mt-1 block text-xs text-red-500">{error}</span> : hint && <span className="mt-1 block text-xs text-fm-slate/60">{hint}</span>}
   </label>
 );
-export const Text = (p) => <input {...p} className={base} />;
-export const Textarea = ({ rows = 4, ...p }) => <textarea rows={rows} {...p} className={`${base} resize-none`} />;
+// API fields are nullable (for example hourlyRate and companyName). Keep these
+// controls controlled from the first render so React never receives null or
+// switches between controlled and uncontrolled modes.
+export const Text = ({ value, ...p }) => <input {...p} value={value ?? ''} className={base} />;
+export const Textarea = ({ rows = 4, value, ...p }) => <textarea rows={rows} {...p} value={value ?? ''} className={`${base} resize-none`} />;
 export function Select({ options = [], value, onChange, className = '', disabled = false, ...props }) {
   const rootRef = useRef(null);
   const listRef = useRef(null);

@@ -1,33 +1,37 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute, { GuestRoute } from './components/layout/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import { load, preloadAppPages } from './lib/routes.js';
+import { useAuth } from './store/authStore.js';
 
-const Landing = lazy(() => import('./pages/Landing.jsx'));
-const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const Recommendations = lazy(() => import('./pages/Recommendations.jsx'));
-const MyProjects = lazy(() => import('./pages/MyProjects.jsx'));
-const Messages = lazy(() => import('./pages/Messages.jsx'));
-const Engagements = lazy(() => import('./pages/Engagements.jsx'));
-const EngagementDetail = lazy(() => import('./pages/EngagementDetail.jsx'));
-const Settings = lazy(() => import('./pages/Settings.jsx'));
-const Onboarding = lazy(() => import('./pages/Onboarding.jsx'));
-const ProjectForm = lazy(() => import('./pages/ProjectForm.jsx'));
-const ProjectDetail = lazy(() => import('./pages/ProjectDetail.jsx'));
-const Browse = lazy(() => import('./pages/Browse.jsx'));
-const FreelancerProfile = lazy(() => import('./pages/FreelancerProfile.jsx'));
-const ProfileEdit = lazy(() => import('./pages/ProfileEdit.jsx'));
-const Notifications = lazy(() => import('./pages/Notifications.jsx'));
-const Admin = lazy(() => import('./pages/Admin.jsx'));
-const NotFound = lazy(() => import('./pages/NotFound.jsx'));
-const Legal = lazy(() => import('./pages/Legal.jsx'));
-const Contact = lazy(() => import('./pages/Contact.jsx'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'));
-const HowItWorks = lazy(() => import('./pages/HowItWorks.jsx'));
+const Landing = lazy(load('Landing'));
+const Dashboard = lazy(load('Dashboard'));
+const Recommendations = lazy(load('Recommendations'));
+const MyProjects = lazy(load('MyProjects'));
+const Messages = lazy(load('Messages'));
+const Engagements = lazy(load('Engagements'));
+const EngagementDetail = lazy(load('EngagementDetail'));
+const Settings = lazy(load('Settings'));
+const Onboarding = lazy(load('Onboarding'));
+const ProjectForm = lazy(load('ProjectForm'));
+const ProjectDetail = lazy(load('ProjectDetail'));
+const Browse = lazy(load('Browse'));
+const FreelancerProfile = lazy(load('FreelancerProfile'));
+const ProfileEdit = lazy(load('ProfileEdit'));
+const Notifications = lazy(load('Notifications'));
+const Admin = lazy(load('Admin'));
+const NotFound = lazy(load('NotFound'));
+const Legal = lazy(load('Legal'));
+const Contact = lazy(load('Contact'));
+const ForgotPassword = lazy(load('ForgotPassword'));
+const ResetPassword = lazy(load('ResetPassword'));
+const HowItWorks = lazy(load('HowItWorks'));
 
 export default function App() {
+  const authed = useAuth((s) => s.status === 'authed');
+  useEffect(() => { if (authed) preloadAppPages(); }, [authed]);
   return (
     <Suspense fallback={<main className="grid min-h-screen place-items-center bg-fm-page p-6"><p role="status" className="text-sm text-fm-slate/70">Se încarcă pagina…</p></main>}>
     <Routes>
@@ -50,7 +54,7 @@ export default function App() {
       <Route element={<ProtectedRoute allowIncomplete />}>
         <Route path="/onboarding" element={<Onboarding />} />
       </Route>
-      <Route element={<ProtectedRoute />}>
+      <Route element={<ProtectedRoute roles={['CLIENT', 'FREELANCER']} />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/projects/mine" element={<MyProjects />} />
@@ -62,9 +66,13 @@ export default function App() {
         <Route path="/messages/:id" element={<Messages />} />
         <Route path="/engagements" element={<Engagements />} />
         <Route path="/engagements/:id" element={<EngagementDetail />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/notifications" element={<Notifications />} />
+      </Route>
+      <Route element={<ProtectedRoute roles={['CLIENT', 'FREELANCER']} allowIncomplete />}>
+        <Route path="/profile/edit" element={<ProfileEdit />} />
+      </Route>
+      <Route element={<ProtectedRoute allowIncomplete />}>
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route element={<ProtectedRoute roles={['ADMIN']} allowIncomplete />}>
         <Route path="/admin" element={<Admin />} />

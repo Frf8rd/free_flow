@@ -1,7 +1,6 @@
 import { config } from '../config.js';
 
-// Access token: doar în memorie (nu ajunge în localStorage). Refresh token: localStorage,
-// sau cookie httpOnly gestionat de server când VITE_REFRESH_COOKIE=true (README, decizia 5).
+// Access token: doar în memorie. Refresh tokenul este fie local, fie cookie HttpOnly gestionat de server.
 const KEY = 'fm-refresh';
 const COOKIE_SESSION_HINT = 'fm-cookie-session';
 let access = null;
@@ -11,6 +10,7 @@ const safe = (fn) => { try { return fn(); } catch { return null; } };
 
 export const tokens = {
   getAccess: () => access,
+  usesHttpOnlyRefresh: () => config.refreshCookie,
   setAccess: (t) => { access = t || null; },
   getRefresh: () => (config.refreshCookie ? null : safe(() => localStorage.getItem(KEY))),
   setRefresh: (t) => { if (!config.refreshCookie) safe(() => (t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY))); },

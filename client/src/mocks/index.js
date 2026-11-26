@@ -4,7 +4,7 @@ import { handle, HttpError } from './server.js';
 // Montează serverul simulat pe instanța axios. Activ doar cu VITE_USE_MOCK=true (npm run dev:mock).
 export function installMock(api) {
   api.defaults.adapter = (config) => new Promise((resolve, reject) => {
-    const delay = 120 + Math.random() * 220;
+    const delay = 20 + Math.random() * 40;
     setTimeout(async () => {
       try {
         const { status, data } = await handle(config);

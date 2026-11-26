@@ -48,7 +48,7 @@ async function getById(req, res) {
 }
 
 async function matches(req, res) {
-  res.json({ data: await matchesService.listForProject(req.user, req.params.id) });
+  res.json(await matchesService.listForProject(req.user, req.params.id));
 }
 
 module.exports = { create, update, close, reopen, remove, list, listMine, getById, matches };

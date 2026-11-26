@@ -1,18 +1,30 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { randomUUID } = require('node:crypto');
+const cloudinary = require('./cloudinaryStorage');
 
-const directory = path.resolve(__dirname, '../../private-storage/profile-images');
+const legacyDirectory = path.resolve(__dirname, '../../private-storage/profile-images');
+
 function safeKey(key) {
   if (typeof key !== 'string' || !/^[a-f0-9-]{36}\.webp$/.test(key)) throw new Error('Invalid image key.');
-  return path.join(directory, key);
-}
-async function save(buffer) {
-  await fs.mkdir(directory, { recursive: true });
-  const key = `${randomUUID()}.webp`;
-  await fs.writeFile(safeKey(key), buffer, { flag: 'wx', mode: 0o600 });
   return key;
 }
-function read(key) { return fs.readFile(safeKey(key)); }
+
+async function save(buffer) {
+  const key = cloudinary.newKey();
+  await cloudinary.upload('profile-images', buffer, key);
+  return key;
+}
+
+async function read(key) {
+  const safe = safeKey(key);
+  try { return await cloudinary.read('profile-images', safe); }
+  catch (error) {
+    try { return await fs.readFile(path.join(legacyDirectory, safe)); }
+    catch (legacyError) {
+      if (legacyError.code === 'ENOENT') throw error;
+      throw legacyError;
+    }
+  }
+}
 
 module.exports = { save, read };

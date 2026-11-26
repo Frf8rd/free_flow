@@ -8,7 +8,8 @@ export const config = {
   currency: env.VITE_CURRENCY || 'EUR',
   locale: env.VITE_LOCALE || 'ro-RO',
   refreshCookie: env.VITE_REFRESH_COOKIE === 'true',
-  maxUploadMb: Number(env.VITE_MAX_UPLOAD_MB || 5),
+  // Serverul Multer acceptă maximum 5 MB; nu expune în client o limită mai mare.
+  maxUploadMb: Math.min(5, Math.max(1, Number(env.VITE_MAX_UPLOAD_MB || 5) || 5)),
   contactEmail: env.VITE_CONTACT_EMAIL || 'contact@fairmatch.example',
   // intervale de polling (README 4.3 / 7.2)
   pollMatchingMs: 3000,

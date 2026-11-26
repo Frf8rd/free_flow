@@ -155,6 +155,26 @@ test("refresh cookie is HttpOnly, SameSite, path-scoped, and readable by the ref
   assert.match(cookie, /Max-Age=0/);
 });
 
+test("production refresh cookie supports the separate Vercel and Render sites", () => {
+  const previous = process.env.NODE_ENV;
+  let cookie;
+  process.env.NODE_ENV = "production";
+  try {
+    const response = { append: (_name, value) => { cookie = value; } };
+    setRefreshCookie(response, "production-refresh-token");
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /SameSite=None/);
+    assert.match(cookie, /Secure/);
+    clearRefreshCookie(response);
+    assert.match(cookie, /SameSite=None/);
+    assert.match(cookie, /Secure/);
+    assert.match(cookie, /Max-Age=0/);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
+  }
+});
+
 test("role middleware denies missing or mismatched roles", () => {
   const invoke = (user, roles) => {
     let status;

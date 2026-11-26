@@ -142,6 +142,7 @@ router.get("/me", authenticate, async (req, res) => {
     name: req.user.name,
     role: req.user.role,
     avatarUrl: req.user.avatarUrl,
+    dashboardBackgroundUrl: req.user.dashboardBackgroundUrl,
     isBlocked: credentials?.isBlocked ?? false,
     createdAt: credentials?.createdAt ?? null,
     onboarded: req.user.role === "ADMIN" || (req.user.role === "FREELANCER" ? Boolean(credentials?.freelancerProfile?.onboarded) : Boolean(credentials?.clientProfile?.onboarded)),

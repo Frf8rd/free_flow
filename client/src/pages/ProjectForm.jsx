@@ -13,11 +13,16 @@ import { clearDraft, readDraft } from '../lib/draft.js';
 import { currencySymbol, toInputDate } from '../lib/format.js';
 import { config } from '../config.js';
 import { track } from '../lib/analytics.js';
+import ProjectImagePicker from '../components/project/ProjectImagePicker.jsx';
+import * as projectService from '../services/projects.js';
+import { useToast } from '../components/feedback/Toast.jsx';
 
 function Form({ project }) {
   const nav = useNavigate();
   const create = useCreateProject(), update = useUpdateProject();
   const cats = useCategories();
+  const { error: showError } = useToast();
+  const [imageFiles, setImageFiles] = useState([]);
   const draft = !project ? readDraft() : null;
   const f = useForm(projectSchema, {
     title: project?.title || '', description: project?.description || draft?.description || '', categoryId: project?.categoryId || '',
@@ -28,12 +33,23 @@ function Form({ project }) {
 
   const onSubmit = f.submit(async (d) => {
     const title = d.title || d.description.split('\n')[0].slice(0, 80);
+    const uploadSelectedImages = async (projectId) => {
+      for (const file of imageFiles) await projectService.uploadAttachment(projectId, file);
+      setImageFiles([]);
+    };
     if (project) {
       await update.mutateAsync({ id: project.id, title, description: d.description, categoryId: d.categoryId, budgetMin: d.budgetMin ?? null, budgetMax: d.budgetMax ?? null, deadline: d.deadline || null, skillIds: d.skillIds || [] });
+      await uploadSelectedImages(project.id);
       nav(`/projects/${project.id}`);
     } else {
       const p = await create.mutateAsync({ title, description: d.description, categoryId: d.categoryId, budgetMin: d.budgetMin, budgetMax: d.budgetMax, deadline: d.deadline || undefined, skillIds: d.skillIds?.length ? d.skillIds : undefined });
       clearDraft(); track('project_created', { hasBudget: d.budgetMax != null });
+      try { await uploadSelectedImages(p.id); }
+      catch (uploadError) {
+        showError(uploadError);
+        nav(`/projects/${p.id}`);
+        return;
+      }
       nav(`/recommendations?projectId=${p.id}`);
     }
   });
@@ -70,6 +86,9 @@ function Form({ project }) {
               <div><p className="mb-2 text-sm font-medium text-fm-ink">Abilități cerute <span className="text-xs font-normal text-fm-slate/50">opțional · le deducem și noi din descriere</span></p><SkillSelector value={f.values.skillIds} onChange={(v) => f.set('skillIds', v)} max={15} /></div>
             </div>
           )}
+          <div className="border-t border-fm-ink/10 pt-5">
+            <ProjectImagePicker files={imageFiles} onChange={setImageFiles} />
+          </div>
           <div className="flex flex-wrap justify-end gap-3 border-t border-fm-ink/10 pt-5">
             <Button type="button" variant="outline" onClick={() => nav(-1)}>Renunță</Button>
             <Button type="submit" loading={f.submitting}>{project ? 'Salvează modificările' : 'Postează și vezi potrivirile'}</Button>

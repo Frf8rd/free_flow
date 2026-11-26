@@ -18,7 +18,7 @@ export default function ImageUpload({ value, onChange, purpose = 'portfolio', sh
     if (!file) return;
     setError('');
     setProgress(0);
-    try { onChange(await uploadImage(file, { purpose, onProgress: setProgress })); }
+    try { await onChange?.(await uploadImage(file, { purpose, onProgress: setProgress })); }
     catch (err) { setError(err.message || 'Încărcarea a eșuat. Încearcă din nou.'); }
     finally { setProgress(null); }
   }

@@ -1,5 +1,8 @@
 client-test/
 server/scripts/
+!server/scripts/
+server/scripts/*
+!server/scripts/migrate-images-to-cloudinary.js
 server/private-storage/
 README.md
 

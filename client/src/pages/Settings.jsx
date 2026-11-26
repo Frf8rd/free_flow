@@ -5,6 +5,7 @@ import PageShell from '../components/layout/PageShell.jsx';
 import Button from '../components/ui/Button.jsx';
 import Icon from '../components/ui/Icon.jsx';
 import { Card } from '../components/ui/Kit.jsx';
+import ImageUpload from '../components/forms/ImageUpload.jsx';
 import { useSession } from '../lib/session.jsx';
 import { useAuth } from '../store/authStore.js';
 import { useChangePassword, useDeleteAccount, useUpdateAccount } from '../hooks/queries.js';
@@ -38,6 +39,7 @@ function SettingBlock({ title, text, children }) {
 export default function Settings() {
   const { theme, setTheme, mode } = useSession();
   const user = useAuth((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
   const navigate = useNavigate();
   const accountMutation = useUpdateAccount();
   const passwordMutation = useChangePassword();
@@ -48,7 +50,11 @@ export default function Settings() {
   const [account, setAccount] = useState({ name: user?.name || '', email: user?.email || '', role: user?.role || mode });
   const [password, setPassword] = useState({ oldPassword: '', newPassword: '' });
   const [deletePassword, setDeletePassword] = useState('');
-  const [background, setBackground] = useState(() => readJson('fm-dashboard-background', { kind: 'gradient', value: backgrounds[0][1] }));
+  const [background, setBackground] = useState(() => {
+    const saved = readJson('fm-dashboard-background', null);
+    return saved?.kind === 'gradient' ? saved : { kind: 'gradient', value: backgrounds[0][1] };
+  });
+  const dashboardBackgroundUrl = user?.dashboardBackgroundUrl || '';
   const [widgetState, setWidgetState] = useState(() => readJson(`fm-widgets-${mode === 'CLIENT' ? 'client' : 'freelancer'}`, {}));
   const flash = (text) => { setMsg(text); setTimeout(() => setMsg(''), 2500); };
   const widgetKey = `fm-widgets-${mode === 'CLIENT' ? 'client' : 'freelancer'}`;
@@ -62,21 +68,31 @@ export default function Settings() {
     setWidgetState(next);
     try { localStorage.setItem(widgetKey, JSON.stringify(next)); } catch { /* setări doar locale */ }
   };
-  const saveBackground = (next) => {
+  const saveBackground = async (next) => {
+    try { await accountMutation.mutateAsync({ dashboardBackgroundUrl: null }); }
+    catch (e) { flash(e.message); return; }
     setBackground(next);
-    try { localStorage.setItem('fm-dashboard-background', JSON.stringify(next)); } catch { /* setare doar locală */ }
+    try { localStorage.setItem('fm-dashboard-background', JSON.stringify(next)); }
+    catch { flash('Gradientul se aplică, dar nu s-a putut salva local.'); }
     window.dispatchEvent(new CustomEvent('fm-dashboard-background-change', { detail: next }));
   };
-  const useImage = (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    createImageBitmap(file).then((bitmap) => {
-      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
-      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
-      saveBackground({ kind: 'image', value: canvas.toDataURL('image/jpeg', 0.78) });
-    }).catch(() => flash('Imaginea nu a putut fi încărcată.'));
+  const saveBackgroundImage = async (url) => {
+    try {
+      await accountMutation.mutateAsync({ dashboardBackgroundUrl: url || null });
+      if (url) {
+        setBackground({ kind: 'gradient', value: '' });
+        try { localStorage.removeItem('fm-dashboard-background'); } catch { /* imaginea rămâne salvată în cont */ }
+      }
+      flash(url ? 'Imaginea de fundal a fost salvată în cont.' : 'Imaginea de fundal a fost eliminată.');
+    } catch (e) { flash(e.message); }
   };
+  useEffect(() => {
+    try {
+      if (JSON.parse(localStorage.getItem('fm-dashboard-background') || 'null')?.kind === 'image') {
+        localStorage.removeItem('fm-dashboard-background');
+      }
+    } catch { /* ignoră preferințele locale vechi */ }
+  }, []);
   useEffect(() => { setWidgetState(readJson(widgetKey, {})); }, [widgetKey]);
   useEffect(() => {
     const requested = searchParams.get('section');
@@ -105,15 +121,15 @@ export default function Settings() {
 
           {section === 'account' && <div className="grid max-w-3xl gap-7">
             <SettingBlock title="Datele contului" text="Numele și emailul folosite pentru autentificare."><form onSubmit={saveAccount} className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-fm-ink">Nume<input required value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><label className="text-sm font-medium text-fm-ink">Email<input required type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} className="mt-1.5 w-full border border-fm-graphite/15 bg-white px-3 py-3 text-sm" /></label><div className="sm:col-span-2"><Button type="submit" loading={accountMutation.isPending}>Salvează datele</Button></div></form></SettingBlock>
-            <SettingBlock title="Spațiul de lucru" text="Contul păstrează datele ambelor profile. Alege rolul folosit acum în FairMatch."><div className="grid gap-2 sm:grid-cols-2">{[['CLIENT', 'Client'], ['FREELANCER', 'Freelancer']].map(([role, label]) => <button key={role} type="button" aria-pressed={account.role === role} onClick={() => setAccount({ ...account, role })} className={`border px-4 py-3 text-sm font-semibold ${account.role === role ? 'border-fm-ink bg-fm-ink text-white' : 'border-fm-graphite/20 text-fm-ink hover:bg-fm-mist/40'}`}>{label}</button>)}</div><button type="button" disabled={accountMutation.isPending || account.role === user?.role} onClick={async () => { try { await accountMutation.mutateAsync({ role: account.role }); flash('Spațiul de lucru a fost schimbat.'); } catch (e) { flash(e.message); } }} className="mt-3 border border-fm-graphite/25 px-4 py-2.5 text-sm font-semibold text-fm-ink disabled:opacity-40">{accountMutation.isPending ? 'Se salvează…' : 'Schimbă spațiul de lucru'}</button></SettingBlock>
+            {!isAdmin && <SettingBlock title="Spațiul de lucru" text="Contul păstrează datele ambelor profile. Alege rolul folosit acum în FairMatch."><div className="grid gap-2 sm:grid-cols-2">{[['CLIENT', 'Client'], ['FREELANCER', 'Freelancer']].map(([role, label]) => <button key={role} type="button" aria-pressed={account.role === role} onClick={() => setAccount({ ...account, role })} className={`border px-4 py-3 text-sm font-semibold ${account.role === role ? 'border-fm-ink bg-fm-ink text-white' : 'border-fm-graphite/20 text-fm-ink hover:bg-fm-mist/40'}`}>{label}</button>)}</div><button type="button" disabled={accountMutation.isPending || account.role === user?.role} onClick={async () => { try { await accountMutation.mutateAsync({ role: account.role }); flash('Spațiul de lucru a fost schimbat.'); } catch (e) { flash(e.message); } }} className="mt-3 border border-fm-graphite/25 px-4 py-2.5 text-sm font-semibold text-fm-ink disabled:opacity-40">{accountMutation.isPending ? 'Se salvează…' : 'Schimbă spațiul de lucru'}</button></SettingBlock>}
           </div>}
           {section === 'appearance' && <div className="max-w-2xl"><SettingBlock title="Tema aplicației" text="Alege aspectul interfeței sau urmează setarea dispozitivului."><div className="grid gap-2 sm:grid-cols-3">{themes.map(([value, label, icon]) => <button key={value} onClick={() => setTheme(value)} aria-pressed={theme === value} className={`flex items-center justify-center gap-2 border px-3 py-3 text-sm font-semibold transition ${theme === value ? 'border-fm-graphite bg-fm-mist/55 text-fm-ink ring-1 ring-fm-graphite/40' : 'border-fm-ink/15 text-fm-slate/75 hover:bg-fm-mist/25'}`}><Icon name={icon} className="h-4 w-4" />{label}</button>)}</div></SettingBlock></div>}
 
           {section === 'dashboard' && <div className="grid max-w-3xl gap-7">
-            <SettingBlock title="Fundal dashboard" text="Alege un gradient mai vizibil sau folosește o imagine de pe dispozitiv.">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{backgrounds.map(([label, value]) => <button key={label} onClick={() => saveBackground({ kind: 'gradient', value })} aria-pressed={background.value === value} className={`h-20 border border-fm-ink/15 p-2 text-left text-xs font-semibold text-fm-ink ${background.value === value ? 'outline outline-2 outline-fm-graphite' : ''}`} style={{ backgroundImage: value }}>{label}</button>)}</div>
+            <SettingBlock title="Fundal dashboard" text="Imaginea se verifică, se salvează și se sincronizează prin contul tău. Poți alege și un gradient simplu.">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{backgrounds.map(([label, value]) => { const active = !dashboardBackgroundUrl && background.value === value; return <button key={label} onClick={() => saveBackground({ kind: 'gradient', value })} aria-pressed={active} className={`h-20 border border-fm-ink/15 p-2 text-left text-xs font-semibold text-fm-ink ${active ? 'outline outline-2 outline-fm-graphite' : ''}`} style={{ backgroundImage: value }}>{label}</button>; })}</div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 border border-fm-ink/20 px-4 py-2.5 text-sm font-semibold text-fm-ink hover:bg-fm-mist/35"><Icon name="image" className="h-4 w-4" /> Încarcă imagine<input type="file" accept="image/*" onChange={(e) => useImage(e.target.files?.[0])} className="sr-only" /></label>
+                <div className="w-full max-w-md"><ImageUpload value={dashboardBackgroundUrl} onChange={saveBackgroundImage} purpose="portfolio" shape="wide" label="Încarcă imagine de fundal" /></div>
                 <button onClick={() => saveBackground({ kind: 'gradient', value: backgrounds[0][1] })} className="px-3 py-2 text-sm font-medium text-fm-slate/70 hover:text-fm-ink">Resetează</button>
               </div>
             </SettingBlock>

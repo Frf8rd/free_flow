@@ -13,7 +13,19 @@ const projectInclude = {
       skill: { select: { id: true, name: true, categoryId: true } },
     },
   },
+  attachments: {
+    select: { storageKey: true },
+    orderBy: { createdAt: "asc" },
+    take: 8,
+  },
 };
+
+function withImageUrls(project) {
+  const { attachments = [], ...data } = project;
+  if (!attachments.length) return data;
+  const images = attachments.map(({ storageKey }) => attachmentStorage.imageUrl(storageKey));
+  return { ...data, images };
+}
 
 function parseOptionalBudget(value, field) {
   if (value === undefined || value === null) return null;
@@ -350,7 +362,7 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
     : [];
   const interestedByProject = new Map();
   for (const row of interested) interestedByProject.set(row.projectId, (interestedByProject.get(row.projectId) ?? 0) + row._count._all);
-  return { data: data.map(({ _count, ...project }) => ({ ...project, matchesCount: _count?.matches ?? 0, interestedCount: interestedByProject.get(project.id) ?? 0 })), page, limit, total };
+  return { data: data.map(({ _count, ...project }) => ({ ...withImageUrls(project), matchesCount: _count?.matches ?? 0, interestedCount: interestedByProject.get(project.id) ?? 0 })), page, limit, total };
 }
 
 async function getProject(id, db = prisma) {
@@ -362,7 +374,7 @@ async function getProject(id, db = prisma) {
     include: projectInclude,
   });
   if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
-  return project;
+  return withImageUrls(project);
 }
 
 module.exports = {

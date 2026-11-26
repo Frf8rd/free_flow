@@ -7,8 +7,12 @@ const controller = require('../controllers/uploads.controller');
 
 const router = Router();
 const limiter = rateLimit({ name: 'profile-image-upload', windowMs: 60 * 60 * 1000, max: 30 });
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 1, parts: 2 }, fileFilter(_req, file, callback) {
-  callback(['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype) ? null : new AppError(415, 'UNSUPPORTED_IMAGE', 'Sunt acceptate doar imagini JPG, PNG sau WebP.'));
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0, parts: 1 }, fileFilter(_req, file, callback) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+    callback(new AppError(415, 'UNSUPPORTED_IMAGE', 'Sunt acceptate doar imagini JPG, PNG sau WebP.'));
+    return;
+  }
+  callback(null, true);
 } }).single('file');
 
 router.post('/', authenticate, limiter, upload, controller.create);

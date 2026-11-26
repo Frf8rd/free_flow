@@ -22,6 +22,7 @@ const userPatchSchema = z
     name: name.optional(),
     role: z.enum(["CLIENT", "FREELANCER"]).optional(),
     avatarUrl: httpsUrl.nullable().optional(),
+    dashboardBackgroundUrl: httpsUrl.nullable().optional(),
     email: z
       .string()
       .trim()
@@ -36,7 +37,7 @@ const userPatchSchema = z
   })
   .strict()
   .refine(
-    (value) => ["name", "avatarUrl", "email", "role"].some((field) => value[field] !== undefined),
+    (value) => ["name", "avatarUrl", "dashboardBackgroundUrl", "email", "role"].some((field) => value[field] !== undefined),
     "Trimite cel puțin un câmp de modificat."
   );
 

@@ -11,7 +11,9 @@ export const useAuth = create((set, get) => ({
   status: 'loading',
 
   async bootstrap() {
-    if (!tokens.hasRefresh()) return set({ status: 'anon' });
+    // Cookie-ul HttpOnly nu poate fi inspectat în JavaScript. Încearcă refresh-ul
+    // la fiecare pornire chiar dacă indiciul local a rămas vechi după o sesiune anterioară.
+    if (!tokens.usesHttpOnlyRefresh() && !tokens.hasRefresh()) return set({ status: 'anon' });
     try {
       await refreshSession();
       set({ user: await auth.me(), status: 'authed' });

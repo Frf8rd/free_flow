@@ -14,7 +14,8 @@
     "test:matching": "node --test src/services/matching/matching.test.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "admin:create": "node scripts/create-admin.js"
+    "admin:create": "node scripts/create-admin.js",
+    "storage:migrate-cloudinary": "node scripts/migrate-images-to-cloudinary.js"
   },
   "keywords": [],
   "author": "",

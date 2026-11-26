@@ -2,22 +2,27 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import SidebarContent from './Sidebar.jsx';
 import Topbar from './Topbar.jsx';
+import { useAuth } from '../../store/authStore.js';
 
 export default function AppLayout({ children }) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('fm-sidebar') === '1');
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('fm-sidebar') === '1'; } catch { return false; } });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const dashboardBackgroundUrl = useAuth((state) => state.user?.dashboardBackgroundUrl || '');
   const [background, setBackground] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('fm-dashboard-background'))?.value || ''; } catch { return ''; }
+    try {
+      const saved = JSON.parse(localStorage.getItem('fm-dashboard-background'));
+      return saved?.kind === 'gradient' ? saved.value : '';
+    } catch { return ''; }
   });
   const { pathname } = useLocation();
 
   useEffect(() => setMobileOpen(false), [pathname]);
-  useEffect(() => localStorage.setItem('fm-sidebar', collapsed ? '1' : '0'), [collapsed]);
+  useEffect(() => { try { localStorage.setItem('fm-sidebar', collapsed ? '1' : '0'); } catch { /* ignorat */ } }, [collapsed]);
   useEffect(() => {
-    const onChange = (event) => setBackground(event.detail?.value || '');
+    const onChange = (event) => setBackground(event.detail?.kind === 'gradient' ? event.detail.value : '');
     const onStorage = (event) => {
       if (event.key !== 'fm-dashboard-background') return;
-      try { setBackground(JSON.parse(event.newValue)?.value || ''); } catch { setBackground(''); }
+      try { const saved = JSON.parse(event.newValue); setBackground(saved?.kind === 'gradient' ? saved.value : ''); } catch { setBackground(''); }
     };
     window.addEventListener('fm-dashboard-background-change', onChange);
     window.addEventListener('storage', onStorage);
@@ -39,7 +44,7 @@ export default function AppLayout({ children }) {
   return (
     <div className="flex h-dvh">
      {/* Fundalul selectat rămâne vizibil în spatele conținutului pe toate rutele. */}
-     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-fm-page/75" style={{ backgroundImage: background || undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+     <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-fm-page/75" style={{ backgroundImage: dashboardBackgroundUrl ? `url("${dashboardBackgroundUrl}")` : background || undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <aside aria-label="Bară laterală" className={`fm-dark hidden shrink-0 bg-fm-ink transition-[width] duration-200 ease-out lg:block ${collapsed ? 'w-[76px]' : 'w-72'}`}>
         <SidebarContent collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       </aside>

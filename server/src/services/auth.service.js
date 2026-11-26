@@ -14,6 +14,7 @@ const publicUserSelect = {
   name: true,
   role: true,
   avatarUrl: true,
+  dashboardBackgroundUrl: true,
 };
 const providerConfig = {
   google: {
@@ -36,6 +37,7 @@ function toSessionUser(user) {
     name: user.name,
     role: user.role,
     avatarUrl: user.avatarUrl,
+    dashboardBackgroundUrl: user.dashboardBackgroundUrl,
     hasPassword: Boolean(user.passwordHash),
   };
 }

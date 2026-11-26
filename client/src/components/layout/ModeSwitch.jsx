@@ -21,7 +21,6 @@ export default function ModeSwitch({ collapsed }) {
   }
   return (
     <div className="w-full">
-      <div className="px-1 pb-1.5"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">Spațiul de lucru</p><p className="mt-0.5 text-[10px] text-white/40">Același cont, comuți oricând</p></div>
       <div role="radiogroup" aria-label="Mod cont" className="grid grid-cols-2 gap-1 rounded-md border border-white/15 bg-white/[0.04] p-1">
         {modes.map((m) => (
           <button key={m.key} role="radio" aria-checked={mode === m.key} onClick={() => switchMode(m.key)} title={m.hint}

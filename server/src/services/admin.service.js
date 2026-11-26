@@ -157,6 +157,31 @@ async function listProjects(query = {}, db = prisma) {
   return { data, page, limit, total };
 }
 
+async function updateProject(projectId, input, db = prisma) {
+  if (typeof projectId !== "string" || !projectId.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Identificatorul proiectului nu este valid.");
+  }
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    Object.keys(input).some((field) => field !== "status") ||
+    !PROJECT_STATUSES.has(input.status)
+  ) {
+    throw new AppError(400, "VALIDATION_ERROR", "Specifică un status valid pentru proiect.");
+  }
+  const project = await db.project.findUnique({ where: { id: projectId.trim() }, select: { id: true } });
+  if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
+  return db.project.update({
+    where: { id: project.id },
+    data: { status: input.status },
+    include: {
+      client: { select: { id: true, name: true, email: true } },
+      category: { select: { id: true, name: true } },
+    },
+  });
+}
+
 async function deleteProject(projectId, db = prisma) {
   if (typeof projectId !== "string" || !projectId.trim()) {
     throw new AppError(400, "VALIDATION_ERROR", "Identificatorul proiectului nu este valid.");
@@ -187,7 +212,29 @@ async function listReports(query = {}, db = prisma) {
       take: limit,
     }),
   ]);
-  return { data, page, limit, total };
+  return { data: await attachReportTargets(data, db), page, limit, total };
+}
+
+// Raportul păstrează doar targetType + targetId; pentru panoul de admin adăugăm un nume lizibil al țintei.
+async function attachReportTargets(reports, db) {
+  const ids = (type) => [...new Set(reports.filter((r) => r.targetType === type).map((r) => r.targetId))];
+  const userIds = ids("USER");
+  const projectIds = ids("PROJECT");
+  const [users, projects] = await Promise.all([
+    userIds.length ? db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } }) : [],
+    projectIds.length ? db.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, title: true } }) : [],
+  ]);
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
+  return reports.map((r) => {
+    const found = r.targetType === "USER" ? userMap.get(r.targetId) : projectMap.get(r.targetId);
+    return {
+      ...r,
+      target: found
+        ? { id: r.targetId, exists: true, label: r.targetType === "USER" ? `${found.name} (${found.email})` : found.title }
+        : { id: r.targetId, exists: false, label: "Conținut șters" },
+    };
+  });
 }
 
 async function resolveReport(adminId, reportId, input, db = prisma) {
@@ -227,10 +274,11 @@ async function resolveReport(adminId, reportId, input, db = prisma) {
 }
 
 async function getStats(db = prisma) {
-  const [users, projects, reports, usersByRole, projectsByStatus, reportsByStatus] = await Promise.all([
+  const [users, projects, reports, engagements, usersByRole, projectsByStatus, reportsByStatus] = await Promise.all([
     db.user.count(),
     db.project.count(),
     db.report.count(),
+    db.engagement.count(),
     db.user.groupBy({ by: ["role"], _count: { _all: true } }),
     db.project.groupBy({ by: ["status"], _count: { _all: true } }),
     db.report.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -239,7 +287,7 @@ async function getStats(db = prisma) {
     rows.map((row) => [row[key], row._count._all]),
   );
   return {
-    totals: { users, projects, reports },
+    totals: { users, projects, reports, engagements },
     usersByRole: toCounts(usersByRole, "role"),
     projectsByStatus: toCounts(projectsByStatus, "status"),
     reportsByStatus: toCounts(reportsByStatus, "status"),
@@ -250,6 +298,7 @@ module.exports = {
   listUsers,
   updateUser,
   listProjects,
+  updateProject,
   deleteProject,
   listReports,
   resolveReport,

@@ -1,37 +1,47 @@
-const fs = require("node:fs/promises");
-const path = require("node:path");
-const { randomUUID } = require("node:crypto");
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const cloudinary = require('./cloudinaryStorage');
 
-const storageDirectory = path.resolve(__dirname, "../../private-storage/project-attachments");
+const legacyDirectory = path.resolve(__dirname, '../../private-storage/project-attachments');
 
 function cleanOriginalName(name) {
-  return path.basename(String(name || "image"))
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .slice(0, 120) || "image";
+  return String(name || 'image')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 120) || 'image';
 }
 
 async function storeImage(buffer) {
-  await fs.mkdir(storageDirectory, { recursive: true });
-  const storageKey = `${randomUUID()}.webp`;
-  const fullPath = path.join(storageDirectory, storageKey);
-  await fs.writeFile(fullPath, buffer, { flag: "wx", mode: 0o600 });
-  return { storageKey, fullPath };
+  const storageKey = cloudinary.newKey();
+  await cloudinary.upload('project-attachments', buffer, storageKey);
+  return { storageKey };
 }
 
-function getPath(storageKey) {
-  if (typeof storageKey !== "string" || !/^[a-f0-9-]{36}\.webp$/.test(storageKey)) {
-    throw new Error("Invalid private attachment key.");
+function safeKey(key) {
+  if (typeof key !== 'string' || !/^[a-f0-9-]{36}\.webp$/.test(key)) throw new Error('Invalid private attachment key.');
+  return key;
+}
+
+function removeImage(key) {
+  return cloudinary.remove('project-attachments', safeKey(key));
+}
+
+function imageUrl(key) {
+  return cloudinary.imageUrl('project-attachments', safeKey(key));
+}
+
+async function readImage(key) {
+  const safe = safeKey(key);
+  try { return await cloudinary.read('project-attachments', safe); }
+  catch (error) {
+    try { return await fs.readFile(path.join(legacyDirectory, safe)); }
+    catch (legacyError) {
+      if (legacyError.code === 'ENOENT') throw error;
+      throw legacyError;
+    }
   }
-  return path.join(storageDirectory, storageKey);
 }
 
-async function removeImage(storageKey) {
-  try { await fs.unlink(getPath(storageKey)); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
-}
-
-async function readImage(storageKey) {
-  return fs.readFile(getPath(storageKey));
-}
-
-module.exports = { cleanOriginalName, storeImage, removeImage, readImage };
+module.exports = { cleanOriginalName, storeImage, removeImage, readImage, imageUrl };

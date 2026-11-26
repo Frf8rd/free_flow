@@ -30,11 +30,12 @@ async function assertCanView(user, project, db = prisma) {
 async function listAttachments(user, projectId, db = prisma) {
   const project = await findProject(projectId, db);
   await assertCanView(user, project, db);
-  return db.projectAttachment.findMany({
+  const attachments = await db.projectAttachment.findMany({
     where: { projectId },
-    select: { id: true, projectId: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
+    select: { id: true, projectId: true, storageKey: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
+  return attachments.map(({ storageKey, ...attachment }) => ({ ...attachment, url: storage.imageUrl(storageKey) }));
 }
 
 async function uploadAttachment(userId, projectId, file, db = prisma) {
@@ -70,7 +71,7 @@ async function uploadAttachment(userId, projectId, file, db = prisma) {
 
   const saved = await storage.storeImage(sanitized);
   try {
-    return await db.projectAttachment.create({
+    const attachment = await db.projectAttachment.create({
       data: {
         projectId,
         uploaderId: userId,
@@ -79,8 +80,9 @@ async function uploadAttachment(userId, projectId, file, db = prisma) {
         sizeBytes: sanitized.length,
         originalName,
       },
-      select: { id: true, projectId: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
+      select: { id: true, projectId: true, storageKey: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
     });
+    return { ...attachment, url: storage.imageUrl(attachment.storageKey) };
   } catch (error) {
     await storage.removeImage(saved.storageKey).catch(() => {});
     throw error;

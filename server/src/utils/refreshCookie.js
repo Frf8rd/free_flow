@@ -16,18 +16,20 @@ function getRefreshToken(req) {
 }
 
 function setRefreshCookie(res, token) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const production = process.env.NODE_ENV === "production";
+  const attributes = `HttpOnly; SameSite=${production ? "None" : "Lax"}${production ? "; Secure" : ""}`;
   res.append(
     "Set-Cookie",
-    `${REFRESH_COOKIE_NAME}=${encodeURIComponent(token)}; Max-Age=${REFRESH_COOKIE_MAX_AGE_SECONDS}; Path=/api/auth; HttpOnly; SameSite=Lax${secure}`,
+    `${REFRESH_COOKIE_NAME}=${encodeURIComponent(token)}; Max-Age=${REFRESH_COOKIE_MAX_AGE_SECONDS}; Path=/api/auth; ${attributes}`,
   );
 }
 
 function clearRefreshCookie(res) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const production = process.env.NODE_ENV === "production";
+  const attributes = `HttpOnly; SameSite=${production ? "None" : "Lax"}${production ? "; Secure" : ""}`;
   res.append(
     "Set-Cookie",
-    `${REFRESH_COOKIE_NAME}=; Max-Age=0; Path=/api/auth; HttpOnly; SameSite=Lax${secure}`,
+    `${REFRESH_COOKIE_NAME}=; Max-Age=0; Path=/api/auth; ${attributes}`,
   );
 }
 

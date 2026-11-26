@@ -1,7 +1,7 @@
 const service = require('../services/matches.service');
 
 async function mine(req, res) { res.json(await service.listMine(req.user, req.query)); }
-async function project(req, res) { res.json({ data: await service.listForProject(req.user, req.params.id) }); }
+async function project(req, res) { res.json(await service.listForProject(req.user, req.params.id)); }
 async function interest(req, res) { res.json({ data: await service.interest(req.user, req.params.id) }); }
 async function invite(req, res) {
   const data = req.params.id

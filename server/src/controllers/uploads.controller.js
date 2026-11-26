@@ -1,10 +1,12 @@
 const sharp = require('sharp');
 const storage = require('../utils/publicImageStorage');
+const cloudmersive = require('../utils/cloudmersive');
 const { AppError } = require('../utils/errors');
 
 async function create(req, res) {
-  if (!['avatar', 'portfolio'].includes(req.body?.purpose)) throw new AppError(400, 'VALIDATION_ERROR', 'purpose trebuie să fie avatar sau portfolio.');
   if (!req.file?.buffer) throw new AppError(400, 'VALIDATION_ERROR', 'Imaginea lipsește.');
+  const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[req.file.mimetype];
+  await cloudmersive.scanBuffer(req.file.buffer, `profile-image.${extension}`);
   let image;
   try {
     image = await sharp(req.file.buffer, { limitInputPixels: 25_000_000 }).rotate().webp({ quality: 84 }).toBuffer();

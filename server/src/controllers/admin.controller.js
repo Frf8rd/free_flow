@@ -15,6 +15,12 @@ async function projects(req, res) {
   res.json(await adminService.listProjects(req.query));
 }
 
+async function updateProject(req, res) {
+  const project = await adminService.updateProject(req.params.id, req.body);
+  writeAuditLog("admin.project_updated", { actorId: req.user.id, resourceId: project.id });
+  res.json({ data: project });
+}
+
 async function deleteProject(req, res) {
   const project = await adminService.deleteProject(req.params.id);
   writeAuditLog("admin.project_deleted", { actorId: req.user.id, resourceId: project.id });
@@ -35,4 +41,4 @@ async function stats(req, res) {
   res.json(await adminService.getStats());
 }
 
-module.exports = { users, updateUser, projects, deleteProject, reports, resolveReport, stats };
+module.exports = { users, updateUser, projects, updateProject, deleteProject, reports, resolveReport, stats };

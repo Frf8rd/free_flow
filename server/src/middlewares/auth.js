@@ -23,6 +23,7 @@ async function authenticate(req, res, next) {
         name: true,
         role: true,
         avatarUrl: true,
+        dashboardBackgroundUrl: true,
         isBlocked: true,
         tokenVersion: true,
       },

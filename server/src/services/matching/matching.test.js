@@ -14,6 +14,7 @@ const {
 const { cosineSimilarity, rankFreelancersWithEmbeddings } = require('./semantic');
 const { createInMemoryQueueAdapter, createMatchingQueue } = require('./queue');
 const { createMatchingWorker } = require('./worker');
+const { persistProjectMatches, getUserSelectedSkills } = require('./application');
 
 const fixedNow = new Date('2026-11-20T12:00:00.000Z');
 const sampleProject = {
@@ -221,4 +222,25 @@ test('queue coalesces quick updates and worker routes jobs to both matching dire
   await new Promise((resolve) => setTimeout(resolve, 20));
   await queue.stop();
   assert.deepEqual(calls, ['project:p-1', 'freelancer:f-1']);
+});
+
+test('project rematching clears obsolete suggestions without deleting user actions', async () => {
+  let cleanup;
+  const db = {
+    match: {
+      findMany: async () => [],
+      deleteMany: async (args) => { cleanup = args; },
+    },
+  };
+  await persistProjectMatches('project-1', [], db);
+  assert.deepEqual(cleanup, { where: { projectId: 'project-1', status: 'SUGGESTED' } });
+});
+
+test('project rematching keeps AI inferred skills separate from client selected skills', () => {
+  const selected = { id: 'react', name: 'React' };
+  const inferred = { id: 'testing', name: 'Testing' };
+  assert.deepEqual(getUserSelectedSkills([
+    { source: 'USER', skill: selected },
+    { source: 'AI', skill: inferred },
+  ]), [selected]);
 });
