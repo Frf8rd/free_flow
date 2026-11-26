@@ -10,11 +10,14 @@ import { useSession } from '../lib/session.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 import { AVAILABILITY, LEVELS, LANGUAGES } from '../lib/format.js';
 
+const freelancerDefaults = () => ({ title: '', bio: '', level: 'BEGINNER', hourlyRate: '', availability: 'AVAILABLE', languages: ['Română'], skillIds: [] });
+const clientDefaults = () => ({ type: 'PERSON', companyName: '', industry: '', description: '' });
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
   const reload = useAuth((s) => s.reload);
-  const { setMode } = useSession();
+  const { setMode, previousMode } = useSession();
   const isFreelancer = user?.role === 'FREELANCER';
   const freelancerProfile = useMyFreelancer(isFreelancer);
   const clientProfile = useMyClient(!isFreelancer);
@@ -24,18 +27,21 @@ export default function Onboarding() {
   const touched = useRef(false);
   const [formError, setFormError] = useState('');
   const [switchingRole, setSwitchingRole] = useState(false);
-  const [form, setForm] = useState(isFreelancer
-    ? { title: '', bio: '', level: 'BEGINNER', hourlyRate: '', availability: 'AVAILABLE', languages: ['Română'], skillIds: [] }
-    : { type: 'PERSON', companyName: '', industry: '', description: '' });
+  // Câte o stare separată pentru fiecare rol: dacă rolul se schimbă (ex. setMode actualizează user.role
+  // înainte să apucăm să resetăm formularul), forma citită nu poate fi niciodată de tipul greșit.
+  const roleKey = isFreelancer ? 'FREELANCER' : 'CLIENT';
+  const [forms, setForms] = useState(() => ({ FREELANCER: freelancerDefaults(), CLIENT: clientDefaults() }));
+  const form = forms[roleKey];
+  const setForm = (updater) => setForms((all) => ({ ...all, [roleKey]: typeof updater === 'function' ? updater(all[roleKey]) : updater }));
   const set = (key) => (event) => { touched.current = true; setForm((current) => ({ ...current, [key]: event.target.value })); setFormError(''); };
 
   useEffect(() => {
     if (touched.current) return;
     const profile = isFreelancer ? freelancerProfile.data : clientProfile.data;
     if (!profile) return;
-    setForm(isFreelancer
+    setForms((all) => ({ ...all, [roleKey]: isFreelancer
       ? { title: profile.title || '', bio: profile.bio || '', level: profile.level || 'BEGINNER', hourlyRate: profile.hourlyRate ?? '', availability: profile.availability || 'AVAILABLE', languages: profile.languages?.length ? profile.languages : ['Română'], skillIds: profile.skills?.map((skill) => skill.id) || [] }
-      : { type: profile.clientProfile?.type || profile.type || 'PERSON', companyName: profile.clientProfile?.companyName || profile.companyName || '', industry: profile.clientProfile?.industry || profile.industry || '', description: profile.clientProfile?.description || profile.description || '' });
+      : { type: profile.clientProfile?.type || profile.type || 'PERSON', companyName: profile.clientProfile?.companyName || profile.companyName || '', industry: profile.clientProfile?.industry || profile.industry || '', description: profile.clientProfile?.description || profile.description || '' } }));
   }, [isFreelancer, freelancerProfile.data, clientProfile.data]);
 
   const save = async (event) => {
@@ -70,9 +76,7 @@ export default function Onboarding() {
     try {
       const updatedUser = await setMode(role);
       touched.current = false;
-      setForm(role === 'FREELANCER'
-        ? { title: '', bio: '', level: 'BEGINNER', hourlyRate: '', availability: 'AVAILABLE', languages: ['Română'], skillIds: [] }
-        : { type: 'PERSON', companyName: '', industry: '', description: '' });
+      setForms((all) => ({ ...all, [role]: role === 'FREELANCER' ? freelancerDefaults() : clientDefaults() }));
       if (updatedUser?.onboarded) navigate('/dashboard', { replace: true });
     } catch (e) {
       setFormError(e.message || 'Nu am putut schimba spațiul de lucru.');
@@ -88,6 +92,7 @@ export default function Onboarding() {
         {[['CLIENT', 'Client'], ['FREELANCER', 'Freelancer']].map(([role, label]) => <button key={role} type="button" role="radio" aria-checked={user?.role === role} disabled={switchingRole || loading} onClick={() => switchRole(role)} className={`border px-3 py-2.5 text-sm font-semibold disabled:opacity-50 ${user?.role === role ? 'border-fm-ink bg-fm-ink text-white' : 'border-fm-graphite/20 text-fm-ink hover:bg-fm-mist/40'}`}>{switchingRole && user?.role !== role ? 'Se schimbă…' : label}</button>)}
       </div>
     </section>
+    {previousMode && previousMode !== user?.role && <button type="button" disabled={switchingRole || loading} onClick={() => switchRole(previousMode)} className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-fm-graphite hover:text-fm-ink disabled:opacity-50">← Înapoi la Dashboard ({previousMode === 'CLIENT' ? 'Client' : 'Freelancer'})</button>}
     <form onSubmit={save} className="mt-6 grid gap-5 sm:grid-cols-2">
       {isFreelancer ? <>
         <Field label="Titlu profesional" className="sm:col-span-2"><Text required minLength={3} maxLength={80} value={form.title} onChange={set('title')} placeholder="ex. Designer UI/UX" /></Field>
@@ -95,7 +100,7 @@ export default function Onboarding() {
         <Field label="Nivel declarat"><Select options={Object.entries(LEVELS).map(([value, label]) => ({ value, label }))} value={form.level} onChange={set('level')} /></Field>
         <Field label="Tarif orar" optional><Text type="number" min="0" inputMode="numeric" value={form.hourlyRate} onChange={set('hourlyRate')} placeholder="La cerere" /></Field>
         <Field label="Disponibilitate"><Select options={Object.entries(AVAILABILITY).map(([value, label]) => ({ value, label }))} value={form.availability} onChange={set('availability')} /></Field>
-        <Field label="Limbi" className="sm:col-span-2"><div className="flex flex-wrap gap-2">{LANGUAGES.map((language) => <button key={language} type="button" aria-pressed={form.languages.includes(language)} onClick={() => { touched.current = true; setForm((current) => ({ ...current, languages: current.languages.includes(language) ? current.languages.filter((x) => x !== language) : [...current.languages, language] })); }} className={`border px-3 py-2 text-xs font-semibold ${form.languages.includes(language) ? 'border-fm-ink bg-fm-ink text-white' : 'border-fm-graphite/20 text-fm-ink'}`}>{language}</button>)}</div></Field>
+        <Field label="Limbi" className="sm:col-span-2"><div className="flex flex-wrap gap-2">{LANGUAGES.map((language) => <button key={language} type="button" aria-pressed={(form.languages || []).includes(language)} onClick={() => { touched.current = true; setForm((current) => ({ ...current, languages: (current.languages || []).includes(language) ? (current.languages || []).filter((x) => x !== language) : [...(current.languages || []), language] })); }} className={`border px-3 py-2 text-xs font-semibold ${(form.languages || []).includes(language) ? 'border-fm-ink bg-fm-ink text-white' : 'border-fm-graphite/20 text-fm-ink'}`}>{language}</button>)}</div></Field>
         <Field label="Abilități" hint="Caută în catalog și adaugă cel puțin una." className="sm:col-span-2"><SkillSelector value={form.skillIds} onChange={(skillIds) => { touched.current = true; setForm((current) => ({ ...current, skillIds })); setFormError(''); }} /></Field>
       </> : <>
         <Field label="Tip cont"><Select options={[{ value: 'PERSON', label: 'Persoană' }, { value: 'COMPANY', label: 'Firmă' }]} value={form.type} onChange={set('type')} /></Field>

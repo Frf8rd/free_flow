@@ -12,6 +12,10 @@ const sysDark = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-
 export function SessionProvider({ children }) {
   const authUser = useAuth((s) => s.user);
   const [modeOverride, setModeState] = useState(() => (read('fm-mode', 'CLIENT') === 'FREELANCER' ? 'FREELANCER' : 'CLIENT'));
+  const [previousMode, setPreviousMode] = useState(() => {
+    const saved = read('fm-previous-mode', '');
+    return ['CLIENT', 'FREELANCER'].includes(saved) ? saved : '';
+  });
   const [theme, setThemeState] = useState(() => read('fm-theme', 'system'));
   const [system, setSystem] = useState(sysDark);
   const [userDetails, setUserDetails] = useState(() => {
@@ -34,6 +38,10 @@ export function SessionProvider({ children }) {
   const setMode = useCallback(async (m) => {
     if (!['CLIENT', 'FREELANCER'].includes(m)) return null;
     if (authUser) {
+      if (authUser.role !== m && ['CLIENT', 'FREELANCER'].includes(authUser.role)) {
+        setPreviousMode(authUser.role);
+        write('fm-previous-mode', authUser.role);
+      }
       await useAuth.getState().updateAccount({ role: m });
       const updated = await useAuth.getState().reload();
       setModeState(updated.role || m);
@@ -60,7 +68,7 @@ export function SessionProvider({ children }) {
     return { ...base, ...userDetails, name, initials, avatar: userDetails.avatar || base.avatarUrl || base.avatar, isAdmin: base.role === 'ADMIN' };
   }, [authUser, userDetails]);
 
-  const value = useMemo(() => ({ user, updateUser, mode, setMode, theme, setTheme, dark }), [user, updateUser, mode, setMode, theme, setTheme, dark]);
+  const value = useMemo(() => ({ user, updateUser, mode, setMode, previousMode, theme, setTheme, dark }), [user, updateUser, mode, setMode, previousMode, theme, setTheme, dark]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

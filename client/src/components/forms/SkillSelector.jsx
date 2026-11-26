@@ -5,7 +5,7 @@ import Icon from '../ui/Icon.jsx';
 import { Select } from '../ui/Fields.jsx';
 
 // Selector de abilități din catalogul real (GET /skills): căutare + filtrare pe categorie, selecția apare ca etichete.
-export default function SkillSelector({ value, onChange, max = 30, error }) {
+export default function SkillSelector({ value, onChange, max = 30, error, stacked = false }) {
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const dq = useDebounce(q, 250);
@@ -26,12 +26,12 @@ export default function SkillSelector({ value, onChange, max = 30, error }) {
           ))}
         </div>
       )}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <label className="relative flex-1"><span className="sr-only">Caută abilitate</span>
+      <div className={`flex min-w-0 flex-col gap-2 ${stacked ? '' : 'sm:flex-row'}`}>
+        <label className="relative min-w-0 flex-1"><span className="sr-only">Caută abilitate</span>
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fm-slate/50" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Caută o abilitate (ex. React, logo, traducere)…" className="w-full rounded-md border border-fm-graphite/15 bg-white py-2.5 pl-9 pr-3 text-sm text-fm-ink focus:border-fm-accent-solid focus:outline-none focus:ring-2 focus:ring-fm-accent-solid/30" />
         </label>
-        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Categorie" className="sm:!w-56" options={[{ value: '', label: 'Toate categoriile' }, ...(cats.data || []).map((c) => ({ value: c.id, label: c.name }))]} />
+        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Categorie" className={stacked ? '' : 'sm:!w-56'} options={[{ value: '', label: 'Toate categoriile' }, ...(cats.data || []).map((c) => ({ value: c.id, label: c.name }))]} />
       </div>
       <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-y-auto">
         {found.isPending && <span className="text-sm text-fm-slate/60">Se încarcă…</span>}
