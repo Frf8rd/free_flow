@@ -72,6 +72,11 @@ export const GoogleButton = ({ className = '', role = 'FREELANCER', mode = 'logi
       identity.initialize({
         client_id: config.googleClientId,
         nonce,
+        // FedCM: browserul afișează singur selectorul de cont, fără window.open,
+        // deci nu mai depinde de blocarea popup-urilor (Chrome/Edge). Celelalte
+        // browsere revin automat la fereastra popup.
+        use_fedcm_for_button: true,
+        use_fedcm_for_prompt: true,
         callback: async ({ credential }) => {
           if (!active) return;
           setError('');
