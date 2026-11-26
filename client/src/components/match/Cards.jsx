@@ -13,7 +13,18 @@ function Score({ value }) {
   return <div className="text-right"><p className={`text-2xl font-bold leading-none ${scoreTone(value)}`}>{value}%</p><p className="mt-1 text-[11px] text-fm-slate/60">potrivire</p></div>;
 }
 
-const Why = ({ items }) => (items?.length ? <ul className="mt-3 space-y-1.5">{items.map((t) => <li key={t} className="flex items-start gap-2 text-sm text-fm-slate/85"><Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{t}</li>)}</ul> : null);
+function Why({ items }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  return <ul className="mt-3 space-y-1.5">{items.map((item) => {
+    const label = typeof item === 'string' ? item : item?.text;
+    if (typeof label !== 'string' || !label) return null;
+    const warning = item?.positive === false;
+    return <li key={item?.code || label} className="flex items-start gap-2 text-sm text-fm-slate/85">
+      <Icon name={warning ? 'alert' : 'check'} className={`mt-0.5 h-4 w-4 shrink-0 ${warning ? 'text-amber-500' : 'text-emerald-500'}`} />
+      {label}
+    </li>;
+  })}</ul>;
+}
 
 // Recomandare pentru CLIENT: un freelancer. onSeen = înregistrează impresia (README 9.7).
 export function FreelancerMatchCard({ match, onInvite, onDismiss, onCompare, compared, onSeen, busy }) {
