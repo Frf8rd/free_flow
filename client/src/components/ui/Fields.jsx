@@ -15,7 +15,7 @@ export const Field = ({ label, hint, error, className = '', children }) => (
 // switches between controlled and uncontrolled modes.
 export const Text = ({ value, ...p }) => <input {...p} value={value ?? ''} className={base} />;
 export const Textarea = ({ rows = 4, value, ...p }) => <textarea rows={rows} {...p} value={value ?? ''} className={`${base} resize-none`} />;
-export function Select({ options = [], value, onChange, className = '', disabled = false, ...props }) {
+export function Select({ options = [], value, onChange, className = '', containerClassName = 'w-full', inline = false, disabled = false, ...props }) {
   const rootRef = useRef(null);
   const listRef = useRef(null);
   const listId = useId();
@@ -31,10 +31,15 @@ export function Select({ options = [], value, onChange, className = '', disabled
   useEffect(() => {
     if (!open) return undefined;
     const outside = (event) => { if (!rootRef.current?.contains(event.target)) setOpen(false); };
-    const escape = (event) => { if (event.key === 'Escape') { setOpen(false); rootRef.current?.querySelector('button[aria-haspopup="listbox"]')?.focus(); } };
+    const escape = (event) => {
+      if (event.key !== 'Escape' || !rootRef.current?.contains(event.target)) return;
+      event.preventDefault();
+      setOpen(false);
+      rootRef.current.querySelector('button[aria-haspopup="listbox"]')?.focus();
+    };
     document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape);
-    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+    document.addEventListener('keydown', escape, true);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
   }, [open]);
 
   const choose = (entry) => {
@@ -60,12 +65,12 @@ export function Select({ options = [], value, onChange, className = '', disabled
   };
 
   return (
-    <div ref={rootRef} className="relative w-full">
+    <div ref={rootRef} className={`relative ${containerClassName}`}>
       <button {...props} type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onKeyDown={onTriggerKeyDown} onClick={() => open ? setOpen(false) : openAt(selectedIndex)} className={`${base} flex min-h-[46px] items-center justify-between gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${className}`}>
         <span className="min-w-0 truncate">{selected?.label ?? 'Alege o opțiune'}</span>
         <Icon name="chevron" className={`h-4 w-4 shrink-0 text-fm-slate/60 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div id={listId} ref={listRef} role="listbox" aria-label={props['aria-label']} onKeyDown={onListKeyDown} className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto border border-fm-ink/15 bg-fm-page p-1 shadow-xl">
+      {open && <div id={listId} ref={listRef} role="listbox" aria-label={props['aria-label']} onKeyDown={onListKeyDown} className={`mt-1 max-h-60 overflow-y-auto border border-fm-ink/15 bg-fm-page p-1 shadow-xl ${inline ? '' : 'absolute left-0 right-0 top-full z-50'}`}>
         {entries.map((entry, index) => <button key={`${entry.value}-${index}`} type="button" role="option" aria-selected={String(entry.value) === String(selected?.value)} data-option-index={index} onClick={() => choose(entry)} className={`flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${String(entry.value) === String(selected?.value) ? 'bg-fm-mist/70 font-semibold text-fm-ink' : 'text-fm-slate hover:bg-fm-mist/45 hover:text-fm-ink'} focus:bg-fm-mist/60 focus:outline-none`}>
           <span className="min-w-0 truncate">{entry.label}</span>
           {String(entry.value) === String(selected?.value) && <Icon name="check" className="h-4 w-4 shrink-0 text-fm-graphite" />}

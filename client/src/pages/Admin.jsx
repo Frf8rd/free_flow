@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import PageShell from '../components/layout/PageShell.jsx';
 import Button from '../components/ui/Button.jsx';
 import Modal from '../components/ui/Modal.jsx';
-import { Textarea } from '../components/ui/Fields.jsx';
+import { Field, Select, Text, Textarea } from '../components/ui/Fields.jsx';
 import { Async, Card, Empty, Pagination, StatCard, Status } from '../components/ui/Kit.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 import { useAuth } from '../store/authStore.js';
@@ -14,6 +14,8 @@ import { PROJECT_STATUS, ROLE_LABEL, formatDate, formatDateTime, timeAgo } from 
 const field = 'rounded-md border border-fm-graphite/15 bg-white px-3 py-2 text-sm text-fm-ink focus:border-fm-accent-solid focus:outline-none focus:ring-2 focus:ring-fm-accent-solid/30';
 const REPORT_STATUS = { OPEN: 'Deschisă', RESOLVED: 'Rezolvată', DISMISSED: 'Respinsă' };
 const REPORT_TONE = { OPEN: 'warn', RESOLVED: 'success', DISMISSED: 'neutral' };
+const options = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }));
+const all = (label, entries) => [{ value: '', label }, ...entries];
 const TARGET_LABEL = { USER: 'Utilizator', PROJECT: 'Proiect' };
 
 const Table = ({ head, children }) => (
@@ -77,25 +79,41 @@ function StatusChart({ title, items, total, colors }) {
 }
 
 /* ---------------- Utilizatori ---------------- */
+function EditDialog({ title, pending, close, save, children }) {
+  return <Modal open title={title} onClose={() => { if (!pending) close(); }}>
+    <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      {children}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" onClick={close} disabled={pending}>Anulează</Button>
+        <Button type="submit" loading={pending}>Salvează</Button>
+      </div>
+    </form>
+  </Modal>;
+}
+
 function Users() {
+  const [draft, setDraft] = useState(null);
   const me = useAuth((s) => s.user);
   const [q, setQ] = useState(''), [role, setRole] = useState(''), [blocked, setBlocked] = useState(''), [page, setPage] = useState(1);
   const dq = useDebounce(q);
   const query = useAdminUsers({ search: dq || undefined, role: role || undefined, blocked: blocked || undefined, page, limit: 20 });
   const upd = useAdminUpdateUser();
   const { toast, error } = useToast();
+  const save = async () => {
+    const { id, name, role: nextRole, originalRole } = draft;
+    try {
+      await upd.mutateAsync({ id, name, ...(nextRole !== originalRole ? { role: nextRole } : {}) });
+      toast('Utilizator actualizat.');
+      setDraft(null);
+    } catch (e) { error(e); }
+  };
   const toggle = async (u) => { try { await upd.mutateAsync({ id: u.id, isBlocked: !u.isBlocked }); toast(u.isBlocked ? 'Utilizator deblocat.' : 'Utilizator blocat.'); } catch (e) { error(e); } };
-  const changeRole = async (u, next) => { if (next === u.role) return; try { await upd.mutateAsync({ id: u.id, role: next }); toast(`Rol schimbat: ${ROLE_LABEL[next]}.`); } catch (e) { error(e); } };
   return (
     <>
       <Toolbar>
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} aria-label="Caută utilizator" placeholder="Caută după nume sau email…" className={`${field} w-full max-w-xs`} />
-        <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} aria-label="Filtrează după rol" className={field}>
-          <option value="">Toate rolurile</option>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select value={blocked} onChange={(e) => { setBlocked(e.target.value); setPage(1); }} aria-label="Filtrează după stare" className={field}>
-          <option value="">Toate stările</option><option value="false">Activi</option><option value="true">Blocați</option>
-        </select>
+        <Select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} aria-label="Filtrează după rol" containerClassName="w-full sm:w-48" options={all('Toate rolurile', options(ROLE_LABEL))} />
+        <Select value={blocked} onChange={(e) => { setBlocked(e.target.value); setPage(1); }} aria-label="Filtrează după stare" containerClassName="w-full sm:w-48" options={all('Toate stările', [{ value: 'false', label: 'Activi' }, { value: 'true', label: 'Blocați' }])} />
       </Toolbar>
       <Async q={query}>
         {(d) => !d.data.length ? <Card><Empty icon="users" title="Niciun utilizator găsit" text="Schimbă căutarea sau filtrele." /></Card> : (
@@ -107,12 +125,10 @@ function Users() {
                   <tr key={u.id}>
                     <Cell className="font-semibold text-fm-ink">{u.name}{self && <span className="ml-2 text-xs font-normal text-fm-slate/60">(tu)</span>}</Cell>
                     <Cell className="text-fm-slate/75">{u.email}{!u.emailVerifiedAt && <span className="ml-2"><Status tone="warn">Neverificat</Status></span>}</Cell>
-                    <Cell>{self
-                      ? ROLE_LABEL[u.role]
-                      : <select value={u.role} disabled={upd.isPending} onChange={(e) => changeRole(u, e.target.value)} aria-label={`Rol pentru ${u.name}`} className={`${field} !py-1.5`}><option value="CLIENT">Client</option><option value="FREELANCER">Freelancer</option><option value="ADMIN">Administrator</option></select>}</Cell>
+                    <Cell>{ROLE_LABEL[u.role]}</Cell>
                     <Cell className="text-fm-slate/65">{formatDate(u.createdAt)}</Cell>
                     <Cell>{u.isBlocked ? <Status tone="danger">Blocat</Status> : <Status tone="success">Activ</Status>}</Cell>
-                    <Cell className="text-right">{!self && <button onClick={() => toggle(u)} disabled={upd.isPending} className="font-semibold text-fm-accent hover:underline disabled:opacity-50">{u.isBlocked ? 'Deblochează' : 'Blochează'}</button>}</Cell>
+                    <Cell className="space-x-3 whitespace-nowrap text-right"><button onClick={() => setDraft({ ...u, originalRole: u.role })} className="font-semibold text-fm-accent hover:underline">Detalii și editare</button>{!self && <button onClick={() => toggle(u)} disabled={upd.isPending} className="font-semibold text-fm-accent hover:underline disabled:opacity-50">{u.isBlocked ? 'Deblochează' : 'Blochează'}</button>}</Cell>
                   </tr>
                 );
               })}
@@ -121,27 +137,47 @@ function Users() {
           </>
         )}
       </Async>
+      {draft && <EditDialog title="Detalii utilizator" pending={upd.isPending} close={() => setDraft(null)} save={save}>
+        <Field label="Nume"><Text required minLength={2} maxLength={80} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+        <Select inline aria-label="Rol utilizator" options={options(ROLE_LABEL)} value={draft.role} disabled={draft.id === me?.id} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
+        <dl className="grid gap-2 text-sm text-fm-slate">
+          <div><dt className="font-semibold">Email</dt><dd className="break-all">{draft.email} · {draft.emailVerifiedAt ? 'verificat' : 'neverificat'}</dd></div>
+          <div><dt className="font-semibold">Activitate</dt><dd>{draft._count?.projects ?? 0} proiecte · {(draft._count?.clientEngagements ?? 0) + (draft._count?.freelancerEngagements ?? 0)} colaborări</dd></div>
+          {draft.clientProfile && <div><dt className="font-semibold">Profil client</dt><dd>{[draft.clientProfile.companyName, draft.clientProfile.industry].filter(Boolean).join(' · ') || 'Persoană fizică'}</dd></div>}
+          {draft.freelancerProfile && <div><dt className="font-semibold">Profil freelancer</dt><dd>{draft.freelancerProfile.title || 'Fără titlu'} · {draft.freelancerProfile.onboarded ? 'completat' : 'incomplet'}</dd></div>}
+        </dl>
+      </EditDialog>}
+
     </>
   );
 }
 
 /* ---------------- Proiecte ---------------- */
 function Projects() {
+  const [draft, setDraft] = useState(null);
   const [q, setQ] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1);
   const dq = useDebounce(q);
   const query = useAdminProjects({ search: dq || undefined, status: status || undefined, page, limit: 20 });
   const upd = useAdminUpdateProject();
   const rm = useAdminRemoveProject();
   const { toast, error } = useToast();
-  const setProjectStatus = async (p, next) => { if (next === p.status) return; try { await upd.mutateAsync({ id: p.id, status: next }); toast(`Stare schimbată: ${PROJECT_STATUS[next]}.`); } catch (e) { error(e); } };
+  const save = async () => {
+    const { id, title, description, status: nextStatus, budgetMin, budgetMax, deadline } = draft;
+    const budget = (value) => value === '' ? null : Number(value);
+    try {
+      await upd.mutateAsync({ id, title, description, status: nextStatus, budgetMin: budget(budgetMin), budgetMax: budget(budgetMax), deadline: deadline || null });
+      toast('Proiect actualizat.');
+      setDraft(null);
+    } catch (e) { error(e); }
+  };
+  const edit = (project) => setDraft({ ...project, budgetMin: project.budgetMin ?? '', budgetMax: project.budgetMax ?? '', deadline: project.deadline?.slice(0, 10) ?? '' });
+  const set = (key) => (event) => setDraft((current) => ({ ...current, [key]: event.target.value }));
   const remove = async (p) => { if (!window.confirm(`Ștergi definitiv proiectul „${p.title}"? Acțiunea nu poate fi anulată.`)) return; try { await rm.mutateAsync(p.id); toast('Proiect șters.'); } catch (e) { error(e); } };
   return (
     <>
       <Toolbar>
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} aria-label="Caută proiect" placeholder="Caută după titlu, descriere sau client…" className={`${field} w-full max-w-xs`} />
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Filtrează după stare" className={field}>
-          <option value="">Toate stările</option>{Object.entries(PROJECT_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Filtrează după stare" containerClassName="w-full sm:w-48" options={all('Toate stările', options(PROJECT_STATUS))} />
       </Toolbar>
       <Async q={query}>
         {(d) => !d.data.length ? <Card><Empty icon="briefcase" title="Niciun proiect găsit" text="Schimbă căutarea sau filtrele." /></Card> : (
@@ -152,9 +188,9 @@ function Projects() {
                   <Cell><Link to={`/projects/${p.id}`} className="font-semibold text-fm-ink hover:underline">{p.title}</Link></Cell>
                   <Cell className="text-fm-slate/75">{p.client?.name || '—'}<span className="block text-xs text-fm-slate/55">{p.client?.email}</span></Cell>
                   <Cell className="text-fm-slate/75">{p.category?.name || '—'}</Cell>
-                  <Cell><select value={p.status} disabled={upd.isPending} onChange={(e) => setProjectStatus(p, e.target.value)} aria-label={`Stare pentru ${p.title}`} className={`${field} !py-1.5`}>{Object.entries(PROJECT_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Cell>
+                  <Cell>{PROJECT_STATUS[p.status]}</Cell>
                   <Cell className="text-fm-slate/65">{timeAgo(p.createdAt)}</Cell>
-                  <Cell className="text-right"><button onClick={() => remove(p)} disabled={rm.isPending} className="font-semibold text-red-500 hover:underline disabled:opacity-50">Șterge</button></Cell>
+                  <Cell className="space-x-3 whitespace-nowrap text-right"><button onClick={() => edit(p)} className="font-semibold text-fm-accent hover:underline">Editează</button><button onClick={() => remove(p)} disabled={rm.isPending} className="font-semibold text-red-500 hover:underline disabled:opacity-50">Șterge</button></Cell>
                 </tr>
               ))}
             </Table>
@@ -162,6 +198,17 @@ function Projects() {
           </>
         )}
       </Async>
+      {draft && <EditDialog title="Editează proiectul" pending={upd.isPending} close={() => setDraft(null)} save={save}>
+        <Field label="Titlu"><Text required maxLength={120} value={draft.title} onChange={set('title')} /></Field>
+        <Field label="Descriere"><Textarea required maxLength={5000} value={draft.description} onChange={set('description')} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Buget minim"><Text type="number" min={0} step={1} value={draft.budgetMin} onChange={set('budgetMin')} /></Field>
+          <Field label="Buget maxim"><Text type="number" min={0} step={1} value={draft.budgetMax} onChange={set('budgetMax')} /></Field>
+          <Field label="Termen"><Text type="date" value={draft.deadline} onChange={set('deadline')} /></Field>
+          <div><span className="mb-1.5 block text-sm font-medium text-fm-ink">Stare</span><Select inline aria-label="Stare proiect" value={draft.status} options={options(PROJECT_STATUS)} onChange={set('status')} /></div>
+        </div>
+      </EditDialog>}
+
     </>
   );
 }
@@ -186,9 +233,7 @@ function Reports() {
   return (
     <>
       <Toolbar>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Filtrează raportările" className={field}>
-          <option value="OPEN">Deschise</option><option value="RESOLVED">Rezolvate</option><option value="DISMISSED">Respinse</option><option value="">Toate</option>
-        </select>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Filtrează raportările" containerClassName="w-full sm:w-48" options={[...options({ OPEN: 'Deschise', RESOLVED: 'Rezolvate', DISMISSED: 'Respinse' }), { value: '', label: 'Toate' }]} />
       </Toolbar>
       <Async q={query}>
         {(d) => !d.data.length ? <Card><Empty icon="flag" title="Nicio raportare" text={status === 'OPEN' ? 'Nu există raportări deschise. Totul e liniștit.' : 'Nu există raportări pentru acest filtru.'} /></Card> : (

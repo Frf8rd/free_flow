@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const { AppError } = require("../utils/errors");
 const { isAdminAllowlisted } = require("../utils/adminAccess");
+const { enqueueMatchingJob } = require("./matching/jobs");
 
 const ROLES = new Set(["CLIENT", "FREELANCER", "ADMIN"]);
 const PROJECT_STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED"]);
@@ -64,6 +65,10 @@ async function listUsers(query = {}, db = prisma) {
         isBlocked: true,
         emailVerifiedAt: true,
         createdAt: true,
+        updatedAt: true,
+        clientProfile: { select: { companyName: true, industry: true, onboarded: true } },
+        freelancerProfile: { select: { title: true, level: true, hourlyRate: true, onboarded: true } },
+        _count: { select: { projects: true, clientEngagements: true, freelancerEngagements: true } },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
@@ -83,11 +88,12 @@ async function updateUser(adminId, userId, input, db = prisma) {
   const fields = Object.keys(input);
   if (
     fields.length === 0 ||
-    fields.some((field) => !["role", "isBlocked"].includes(field)) ||
+    fields.some((field) => !["role", "isBlocked", "name"].includes(field)) ||
+    (input.name !== undefined && (typeof input.name !== "string" || input.name.trim().length < 2 || input.name.trim().length > 80)) ||
     (input.role !== undefined && !ROLES.has(input.role)) ||
     (input.isBlocked !== undefined && typeof input.isBlocked !== "boolean")
   ) {
-    throw new AppError(400, "VALIDATION_ERROR", "Specifică un rol valid sau starea de blocare.");
+    throw new AppError(400, "VALIDATION_ERROR", "Specifică un nume, rol sau stare de blocare validă.");
   }
   if (adminId === userId && (input.role !== undefined || input.isBlocked === true)) {
     throw new AppError(400, "SELF_ADMIN_CHANGE", "Nu poți să-ți schimbi rolul sau să-ți blochezi propriul cont.");
@@ -104,6 +110,7 @@ async function updateUser(adminId, userId, input, db = prisma) {
   }
 
   const data = { ...input };
+  if (data.name !== undefined) data.name = data.name.trim();
   if (
     (input.role !== undefined && input.role !== target.role) ||
     (input.isBlocked === true && !target.isBlocked)
@@ -165,21 +172,56 @@ async function updateProject(projectId, input, db = prisma) {
     !input ||
     typeof input !== "object" ||
     Array.isArray(input) ||
-    Object.keys(input).some((field) => field !== "status") ||
-    !PROJECT_STATUSES.has(input.status)
+    !Object.keys(input).length ||
+    Object.keys(input).some((field) => !["status", "title", "description", "budgetMin", "budgetMax", "deadline"].includes(field)) ||
+    (input.status !== undefined && !PROJECT_STATUSES.has(input.status))
   ) {
     throw new AppError(400, "VALIDATION_ERROR", "Specifică un status valid pentru proiect.");
   }
-  const project = await db.project.findUnique({ where: { id: projectId.trim() }, select: { id: true } });
+  const project = await db.project.findUnique({ where: { id: projectId.trim() }, select: { id: true, status: true, budgetMin: true, budgetMax: true } });
   if (!project) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
-  return db.project.update({
+  const data = { ...input };
+  for (const [field, min, max] of [["title", 1, 120], ["description", 1, 5000]]) {
+    if (data[field] === undefined) continue;
+    if (typeof data[field] !== "string" || data[field].trim().length < min || data[field].trim().length > max) {
+      throw new AppError(400, "VALIDATION_ERROR", `Câmpul ${field} trebuie să aibă între ${min} și ${max} de caractere.`);
+    }
+    data[field] = data[field].trim();
+  }
+  for (const field of ["budgetMin", "budgetMax"]) {
+    const value = data[field];
+    if (value != null && (!Number.isInteger(value) || value < 0 || value > 2147483647)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Bugetul trebuie să fie un număr întreg valid.");
+    }
+  }
+  const min = data.budgetMin === undefined ? project.budgetMin : data.budgetMin;
+  const max = data.budgetMax === undefined ? project.budgetMax : data.budgetMax;
+  if (min != null && max != null && min > max) throw new AppError(400, "VALIDATION_ERROR", "Bugetul minim depășește bugetul maxim.");
+  if (data.deadline != null) {
+    if (typeof data.deadline !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data.deadline)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Termenul trebuie să fie o dată validă.");
+    }
+    const deadline = new Date(data.deadline);
+    if (!Number.isFinite(deadline.getTime()) || deadline.toISOString().slice(0, 10) !== data.deadline) {
+      throw new AppError(400, "VALIDATION_ERROR", "Termenul trebuie să fie o dată validă.");
+    }
+    data.deadline = deadline;
+  }
+  const rematch = (data.status ?? project.status) === "OPEN" &&
+    (project.status !== "OPEN" || Object.keys(data).some((field) => field !== "status"));
+  const save = async (tx) => {
+    const updated = await tx.project.update({
     where: { id: project.id },
-    data: { status: input.status },
+    data: { ...data, ...(rematch ? { matchingStatus: "PENDING", matchingError: null } : {}) },
     include: {
       client: { select: { id: true, name: true, email: true } },
       category: { select: { id: true, name: true } },
     },
-  });
+    });
+    if (rematch) await enqueueMatchingJob("PROJECT", project.id, tx);
+    return updated;
+  };
+  return rematch ? db.$transaction(save) : save(db);
 }
 
 async function deleteProject(projectId, db = prisma) {

@@ -3,15 +3,17 @@ import Icon from './Icon.jsx';
 
 export default function Modal({ open, onClose, title, children, footer, size = 'max-w-lg' }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return undefined;
     const prev = document.activeElement;
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    const onKey = (e) => e.key === 'Escape' && !e.defaultPrevented && onCloseRef.current?.();
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     ref.current?.focus();
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; prev?.focus?.(); };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center" role="dialog" aria-modal="true" aria-label={title}>
