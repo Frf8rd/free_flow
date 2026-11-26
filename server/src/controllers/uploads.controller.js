@@ -14,7 +14,11 @@ async function create(req, res) {
     throw new AppError(415, 'INVALID_IMAGE', 'Fișierul încărcat nu este o imagine validă.');
   }
   const key = await storage.save(image);
-  res.status(201).json({ url: `${req.protocol}://${req.get('host')}/api/uploads/${key}` });
+  // În spatele proxy-ului Render, req.protocol este "http"; URL-ul salvat trebuie să fie https.
+  const configured = (process.env.PUBLIC_API_URL || '').replace(/\/+$/, '');
+  const base = configured
+    || (process.env.NODE_ENV === 'production' ? `https://${req.get('host')}` : `${req.protocol}://${req.get('host')}`);
+  res.status(201).json({ url: `${base}/api/uploads/${key}` });
 }
 
 async function read(req, res) {
