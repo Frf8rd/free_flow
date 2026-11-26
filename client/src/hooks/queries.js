@@ -80,13 +80,13 @@ export const useAiDisclosure = () => useInvalidating(({ id, usedAi }) => engagem
 export const useReview = () => useInvalidating(({ id, ...body }) => engagements.review(id, body), [['engagement'], ['freelancer'], ['freelancer-reviews']]);
 
 /* ---------- chat ---------- */
-export const useConversations = (enabled = true) => useQuery({
+export const useConversations = (enabled = true, realtime = false) => useQuery({
   queryKey: ['conversations'],
   queryFn: conversations.list,
   enabled,
-  refetchInterval: (query) => enabled && document.visibilityState === 'visible' ? Math.max(config.pollChatMs * 6, 30_000) : false,
+  refetchInterval: (query) => enabled && !realtime && document.visibilityState === 'visible' ? Math.max(config.pollChatMs * 12, 60_000) : false,
 });
-export const useMessages = (id) => useQuery({ queryKey: ['messages', id], queryFn: () => conversations.messages(id, { limit: 100 }), enabled: !!id, refetchInterval: config.pollChatMs });
+export const useMessages = (id, realtime = false) => useQuery({ queryKey: ['messages', id], queryFn: () => conversations.messages(id, { limit: 100 }), enabled: !!id, refetchInterval: realtime ? false : config.pollChatMs * 3 });
 export const useSendMessage = (id) => {
   const qc = useQueryClient();
   const me = useAuth((s) => s.user);

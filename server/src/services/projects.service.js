@@ -14,7 +14,7 @@ const projectInclude = {
     },
   },
   attachments: {
-    select: { storageKey: true },
+    select: { id: true },
     orderBy: { createdAt: "asc" },
     take: 8,
   },
@@ -23,7 +23,7 @@ const projectInclude = {
 function withImageUrls(project) {
   const { attachments = [], ...data } = project;
   if (!attachments.length) return data;
-  const images = attachments.map(({ storageKey }) => attachmentStorage.imageUrl(storageKey));
+  const images = attachments.map(({ id }) => attachmentStorage.imageUrl(project.id, id));
   return { ...data, images };
 }
 

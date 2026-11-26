@@ -2,6 +2,7 @@ import { seed } from './seed.js';
 
 const KEY = 'fm-mock-db-v1';
 let db;
+let mockRefreshToken = null;
 try { db = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { db = null; }
 if (!db) db = seed();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* ignorat */ } };
@@ -152,20 +153,25 @@ r('POST', '/auth/register', ({ body }) => {
   if (db.users.some((u) => u.email.toLowerCase() === body.email.toLowerCase())) throw new HttpError(409, 'Există deja un cont cu acest email.', { email: 'Email deja folosit.' }, 'EMAIL_TAKEN');
   const u = { id: uid('u'), name: body.name.trim(), email: body.email.trim(), role: body.role, password: body.password, avatarUrl: '', isBlocked: false, createdAt: nowIso() };
   db.users.push(u);
+  mockRefreshToken = `mockr.${u.id}`;
   return [201, { user: userDto(u), accessToken: `mock.${u.id}`, refreshToken: `mockr.${u.id}` }];
 });
 r('POST', '/auth/login', ({ body }) => {
   const u = db.users.find((x) => x.email.toLowerCase() === (body.email || '').toLowerCase());
   if (!u || u.password !== body.password) throw new HttpError(401, 'Email sau parolă incorectă.', null, 'INVALID_CREDENTIALS');
   if (u.isBlocked) throw forbidden('Contul a fost blocat. Scrie-ne dacă crezi că e o greșeală.');
+  mockRefreshToken = `mockr.${u.id}`;
   return { user: userDto(u), accessToken: `mock.${u.id}`, refreshToken: `mockr.${u.id}` };
 });
 r('POST', '/auth/refresh', ({ body }) => {
-  const id = (body.refreshToken || '').replace('mockr.', ''); const u = U(id);
+  const token = body.refreshToken || mockRefreshToken;
+  const id = (token || '').replace('mockr.', ''); const u = U(id);
   if (!u || u.isBlocked) throw new HttpError(401, 'Sesiune invalidă.', null, 'INVALID_TOKEN');
-  return { accessToken: `mock.${u.id}`, refreshToken: body.refreshToken };
+  mockRefreshToken = `mockr.${u.id}`;
+  return { accessToken: `mock.${u.id}`, refreshToken: mockRefreshToken };
 });
-r('POST', '/auth/logout', () => ({ ok: true }));
+r('POST', '/auth/logout', () => { mockRefreshToken = null; return { ok: true }; });
+r('POST', '/auth/oauth/google/challenge', () => ({ nonce: 'mock-google-nonce' }));
 r('GET', '/auth/me', ({ me }) => ({ user: { ...userDto(need(me)), freelancerProfile: FPofUser(me.id) ? freelancerDto(FPofUser(me.id), true) : undefined, clientProfile: CP(me.id) } }));
 r('POST', '/auth/change-password', ({ me, body }) => { need(me); if (me.password !== body.oldPassword) throw bad('Parola curentă este incorectă.', { oldPassword: 'Parola curentă este incorectă.' }); me.password = body.newPassword; return { ok: true }; });
 r('POST', '/auth/forgot-password', () => ({ ok: true }));

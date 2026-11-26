@@ -58,7 +58,7 @@ export default function AppLayout({ children }) {
         </div>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-fm-page/70">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-fm-page/90">
         <div className="shrink-0 border-b border-fm-ink/10 px-3 py-3 sm:px-5 sm:py-4"><Topbar onMenu={() => setMobileOpen(true)} /></div>
         {children}
       </div>

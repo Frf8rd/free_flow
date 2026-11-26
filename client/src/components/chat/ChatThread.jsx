@@ -5,11 +5,11 @@ import { useAuth } from '../../store/authStore.js';
 import { formatTime } from '../../lib/format.js';
 
 export default function ChatThread({ conv, className = '' }) {
-  const { send, markRead } = useChat();
+  const { send, markRead, connected } = useChat();
   const me = useAuth((s) => s.user);
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
-  const query = useMessages(conv.id);
+  const query = useMessages(conv.id, connected);
   const messages = query.data || [];
 
   useEffect(() => { markRead(conv.id); }, [conv.id, conv.unread, markRead]);

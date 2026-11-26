@@ -16,7 +16,9 @@ export default function FreelancerProfile() {
   const { mode, user } = useSession();
   const query = useFreelancer(id);
   const reviews = useFreelancerReviews(query.data?.id, 1);
-  const isClient = mode === 'CLIENT';
+  // Profilurile freelancerilor sunt publice; nu porni cererea privată de
+  // proiecte doar pentru că modul implicit al unui vizitator este CLIENT.
+  const isClient = !!user?.id && user.role === 'CLIENT' && mode === 'CLIENT';
   const projects = useMyProjects(isClient);
   const invite = useInviteManual();
   const [projectId, setProjectId] = useState('');

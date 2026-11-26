@@ -28,8 +28,11 @@ function removeImage(key) {
   return cloudinary.remove('project-attachments', safeKey(key));
 }
 
-function imageUrl(key) {
-  return cloudinary.imageUrl('project-attachments', safeKey(key));
+function imageUrl(projectId, attachmentId) {
+  if (typeof projectId !== 'string' || !projectId || typeof attachmentId !== 'string' || !attachmentId) {
+    throw new TypeError('Invalid project attachment reference.');
+  }
+  return `/projects/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}/file`;
 }
 
 async function readImage(key) {

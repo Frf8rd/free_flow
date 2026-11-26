@@ -1,8 +1,12 @@
 const env = import.meta.env;
 const apiUrl = env.VITE_API_URL || (env.PROD ? '/api' : 'http://localhost:4000/api');
+const socketUrl = env.VITE_SOCKET_URL || (apiUrl.startsWith('http')
+  ? new URL(apiUrl).origin
+  : env.PROD ? 'https://fairmatch-api.onrender.com' : 'http://localhost:4000');
 
 export const config = {
   apiUrl,
+  socketUrl,
   googleClientId: env.VITE_GOOGLE_CLIENT_ID || '',
   useMock: env.VITE_USE_MOCK === 'true',
   currency: env.VITE_CURRENCY || 'EUR',

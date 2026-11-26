@@ -38,10 +38,13 @@ function getSmtpConfig() {
 function getEmailConfig() {
   const from = (process.env.EMAIL_FROM || "").trim();
   const resendApiKey = (process.env.RESEND_API_KEY || "").trim();
-  if (resendApiKey) {
+  const provider = (process.env.EMAIL_PROVIDER || (resendApiKey ? "resend" : "smtp")).trim().toLowerCase();
+  if (provider === "resend") {
+    if (!resendApiKey) throw new AppError(503, "EMAIL_NOT_CONFIGURED", "Adaugă RESEND_API_KEY pentru trimiterea emailurilor prin HTTP.");
     if (!from) throw new AppError(503, "EMAIL_NOT_CONFIGURED", "EMAIL_FROM trebuie configurat pentru trimiterea emailurilor.");
     return { provider: "resend", apiKey: resendApiKey, from };
   }
+  if (provider !== "smtp") throw new AppError(503, "EMAIL_NOT_CONFIGURED", "EMAIL_PROVIDER trebuie să fie smtp sau resend.");
   return { provider: "smtp", ...getSmtpConfig() };
 }
 

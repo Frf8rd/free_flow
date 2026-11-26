@@ -17,7 +17,7 @@ router.get("/", projectsController.list);
 router.get("/me", authenticate, requireRole("CLIENT"), projectsController.listMine);
 router.get("/:id/matches", authenticate, requireRole("CLIENT"), projectsController.matches);
 router.get("/:id/attachments", authenticate, attachmentsController.list);
-router.get("/:id/attachments/:attachmentId/file", authenticate, attachmentsController.file);
+router.get("/:id/attachments/:attachmentId/file", authenticateOptional, attachmentsController.file);
 router.post("/", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.create);
 router.patch("/:id", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.update);
 router.patch("/:id/close", authenticate, requireRole("CLIENT"), projectMutationLimiter, projectsController.close);

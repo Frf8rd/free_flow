@@ -15,7 +15,8 @@ async function findProject(projectId, db = prisma) {
 }
 
 async function assertCanView(user, project, db = prisma) {
-  if (project.clientId === user.id || project.status === "OPEN") return;
+  if (project.status === "OPEN" || user?.id === project.clientId) return;
+  if (!user?.id) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
   const acceptedEngagement = await db.engagement.findFirst({
     where: {
       projectId: project.id,
@@ -35,7 +36,7 @@ async function listAttachments(user, projectId, db = prisma) {
     select: { id: true, projectId: true, storageKey: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
-  return attachments.map(({ storageKey, ...attachment }) => ({ ...attachment, url: storage.imageUrl(storageKey) }));
+  return attachments.map(({ storageKey, ...attachment }) => ({ ...attachment, url: storage.imageUrl(projectId, attachment.id) }));
 }
 
 async function uploadAttachment(userId, projectId, file, db = prisma) {
@@ -82,7 +83,8 @@ async function uploadAttachment(userId, projectId, file, db = prisma) {
       },
       select: { id: true, projectId: true, storageKey: true, mimeType: true, sizeBytes: true, originalName: true, createdAt: true },
     });
-    return { ...attachment, url: storage.imageUrl(attachment.storageKey) };
+    const { storageKey, ...publicAttachment } = attachment;
+    return { ...publicAttachment, url: storage.imageUrl(projectId, attachment.id) };
   } catch (error) {
     await storage.removeImage(saved.storageKey).catch(() => {});
     throw error;
@@ -97,7 +99,8 @@ async function getAttachment(user, projectId, attachmentId, db = prisma) {
     select: { id: true, storageKey: true, mimeType: true, originalName: true },
   });
   if (!attachment) throw new AppError(404, "ATTACHMENT_NOT_FOUND", "Imaginea nu a fost găsită.");
-  return { ...attachment, buffer: await storage.readImage(attachment.storageKey) };
+  const { storageKey, ...publicAttachment } = attachment;
+  return { ...publicAttachment, buffer: await storage.readImage(storageKey) };
 }
 
 async function deleteAttachment(userId, projectId, attachmentId, db = prisma) {

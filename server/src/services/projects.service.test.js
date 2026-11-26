@@ -250,6 +250,8 @@ test("reopenProject changes CLOSED to OPEN only for its owner", async () => {
 test("deleteProject permanently deletes only a project owned by the client", async () => {
   let deleted;
   const db = {
+    engagement: { findFirst: async () => null },
+    conversation: { findFirst: async () => null },
     project: {
       findUnique: async () => ({
         id: "project-1",

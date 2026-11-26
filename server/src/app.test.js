@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const projectsService = require("./services/projects.service");
 
 process.env.JWT_SECRET = "test-only-secret-that-is-at-least-32-bytes-long";
 process.env.NODE_ENV = "test";
@@ -17,7 +18,10 @@ async function withServer(t, run) {
   return run(`http://127.0.0.1:${server.address().port}/api`);
 }
 
-test("health and protected authentication routes return expected access control", async (t) => {
+test("health, public browse, and protected routes return expected access control", async (t) => {
+  const originalListProjects = projectsService.listProjects;
+  projectsService.listProjects = async () => ({ data: [], page: 1, limit: 20, total: 0 });
+  t.after(() => { projectsService.listProjects = originalListProjects; });
   await withServer(t, async (baseUrl) => {
     const health = await fetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
@@ -37,8 +41,9 @@ test("health and protected authentication routes return expected access control"
     const protectedRoleRoute = await fetch(`${baseUrl}/access/client`);
     assert.equal(protectedRoleRoute.status, 401);
 
-    const protectedProjects = await fetch(`${baseUrl}/projects`);
-    assert.equal(protectedProjects.status, 401);
+    const publicProjects = await fetch(`${baseUrl}/projects`);
+    assert.equal(publicProjects.status, 200);
+    assert.deepEqual(await publicProjects.json(), { data: [], page: 1, limit: 20, total: 0 });
     const createProject = await fetch(`${baseUrl}/projects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,7 +161,7 @@ test("social login reports missing Google configuration instead of accepting an 
     });
     assert.equal(response.status, 503);
     assert.equal((await response.json()).error.code, "PROVIDER_NOT_CONFIGURED");
-    assert.equal(response.headers.get("ratelimit-limit"), "100");
+    assert.equal(response.headers.get("ratelimit-limit"), "300");
   });
 });
 

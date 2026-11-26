@@ -40,8 +40,8 @@ async function startConversation(user, projectId, otherUserId, db = prisma) {
   const clientId = project.clientId;
   const freelancerId = isClient ? otherUserId : user.id;
   if (isFreelancer && otherUserId !== clientId) throw new AppError(403, "FORBIDDEN", "Celălalt participant trebuie să fie clientul proiectului.");
-  const match = await db.match.findFirst({ where: { projectId, freelancer: { userId: freelancerId }, status: { in: ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"] } }, select: { id: true } });
-  if (!match) throw new AppError(409, "MATCH_REQUIRED", "Conversația devine disponibilă după interesul freelancerului sau invitația clientului.");
+  const match = await db.match.findFirst({ where: { projectId, freelancer: { userId: freelancerId }, status: "ACCEPTED" }, select: { id: true } });
+  if (!match) throw new AppError(409, "MATCH_REQUIRED", "Conversația devine disponibilă după acceptarea potrivirii de ambele părți.");
   return db.conversation.upsert({ where: { matchId: match.id }, create: { matchId: match.id, projectId, clientId, freelancerId }, update: {}, include: { project: { select: { id: true, title: true } } } });
 }
 
@@ -71,7 +71,7 @@ async function sendMessage(userId, conversationId, input, db = prisma) {
     if (!conversation) throw new AppError(404, "CONVERSATION_NOT_FOUND", "Conversația nu a fost găsită.");
     const canMessage = conversation.engagement
       ? ["IN_PROGRESS", "DELIVERED"].includes(conversation.engagement.status)
-      : Boolean(conversation.match && ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"].includes(conversation.match.status));
+      : conversation.match?.status === "ACCEPTED";
     if (!canMessage) {
       throw new AppError(409, "CONVERSATION_CLOSED", "Nu mai poți trimite mesaje în această colaborare.");
     }

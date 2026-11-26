@@ -38,6 +38,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "3.1.11"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "effect": "^3.22.5"
   }
 }

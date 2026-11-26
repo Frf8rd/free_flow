@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import ChatThread from '../components/chat/ChatThread.jsx';
@@ -11,13 +11,18 @@ export default function Messages() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { convs, loading, error } = useChat();
+  const { convs, loading, error, join } = useChat();
   const [q, setQ] = useState('');
   const [onlyUnread, setOnlyUnread] = useState(false);
   const selectedId = id || searchParams.get('c');
   const active = convs.find((c) => c.id === selectedId) || (!selectedId ? convs[0] : null);
   const showChat = Boolean(selectedId && active); // pe telefon: listă sau conversație
   const list = convs.filter((c) => `${c.name} ${c.project}`.toLowerCase().includes(q.toLowerCase()) && (!onlyUnread || c.unread));
+
+  useEffect(() => {
+    join(active?.id);
+    return () => join('');
+  }, [active?.id, join]);
 
   return (
     <AppLayout>

@@ -6,7 +6,7 @@ const emailService = require("./email.service");
 const { hashRefreshToken } = require("../utils/hash");
 
 test("SMTP configuration rejects invalid port and secure values", (t) => {
-  const keys = ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"];
+  const keys = ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_PROVIDER", "RESEND_API_KEY"];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   t.after(() => {
     for (const key of keys) {
@@ -26,6 +26,12 @@ test("SMTP configuration rejects invalid port and secure values", (t) => {
   process.env.SMTP_PORT = "587";
   process.env.SMTP_SECURE = "sometimes";
   assert.throws(() => emailService.getSmtpConfig(), { code: "EMAIL_NOT_CONFIGURED" });
+
+  process.env.EMAIL_PROVIDER = "resend";
+  delete process.env.RESEND_API_KEY;
+  assert.throws(() => emailService.getEmailConfig(), { code: "EMAIL_NOT_CONFIGURED" });
+  process.env.RESEND_API_KEY = "test-key";
+  assert.equal(emailService.getEmailConfig().provider, "resend");
 });
 
 test("email verification rejects malformed tokens before querying storage", async () => {
@@ -135,7 +141,7 @@ test("pending registration stores no User and emails a one-time verification lin
   assert.equal(pendingData.email, "new@example.com");
   assert.equal(pendingData.passwordHash, "hashed-password");
   assert.match(pendingData.tokenHash, /^[a-f0-9]{64}$/);
-  assert.match(sentEmail.text, /verifyEmailToken/);
+  assert.match(sentEmail.text, /\/verify-email\?token=/);
 });
 
 test("password reset validates password strength before token lookup", async () => {
