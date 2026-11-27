@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../ui/Icon.jsx';
+import { profileCompleteness } from '../../lib/profile.js';
+import { PROJECT_STATUS } from '../../lib/format.js';
 import { useSession } from '../../lib/session.jsx';
 import { useCounts, useEngagements, useMyClient, useMyFreelancer, useMyMatches, useMyProjects, useTier } from '../../hooks/queries.js';
 
@@ -29,7 +31,7 @@ export default function SidePanel({ mode }) {
   const activeEngagements = (engagements.data || []).filter((item) => ['IN_PROGRESS', 'DELIVERED'].includes(item.status));
   const completion = client
     ? Math.round(([!!user.name, !!user.email, !!clientProfile.data?.type, !!clientProfile.data?.description].filter(Boolean).length / 4) * 100)
-    : Math.round(([!!user.name, !!(user.avatarUrl || user.avatar), !!freelancer.data?.title, (freelancer.data?.bio || '').length >= 30, (freelancer.data?.skills || []).length >= 3, !!freelancer.data?.hourlyRate, (freelancer.data?.portfolio || []).length >= 1].filter(Boolean).length / 7) * 100);
+    : profileCompleteness(freelancer.data).percent;
 
   const items = useMemo(() => {
     const c = counts.data || {};
@@ -38,9 +40,9 @@ export default function SidePanel({ mode }) {
         {!client && <li><Link to="/recommendations" className="flex items-center gap-3 px-1 py-2 hover:bg-fm-mist/60"><Icon name="sparkle" className="h-4 w-4 text-fm-accent" /><span className="min-w-0 flex-1 text-sm">Potriviri noi</span><b className="text-sm">{c.matches || 0}</b></Link></li>}
         <li><Link to="/messages" className="flex items-center gap-3 px-1 py-2 hover:bg-fm-mist/60"><Icon name="chat" className="h-4 w-4 text-fm-accent" /><span className="min-w-0 flex-1 text-sm">Mesaje necitite</span><b className="text-sm">{c.messages || 0}</b></Link></li>
         <li><Link to="/notifications" className="flex items-center gap-3 px-1 py-2 hover:bg-fm-mist/60"><Icon name="bell" className="h-4 w-4 text-fm-accent" /><span className="min-w-0 flex-1 text-sm">Notificări noi</span><b className="text-sm">{c.notifications || 0}</b></Link></li>
-        {client && <li><Link to="/engagements" className="flex items-center gap-3 px-1 py-2 hover:bg-fm-mist/60"><Icon name="check" className="h-4 w-4 text-fm-accent" /><span className="min-w-0 flex-1 text-sm">Livrări de verificat</span><b className="text-sm">{projectRows.filter((p) => p.status === 'DELIVERED').length}</b></Link></li>}
+        {client && <li><Link to="/engagements" className="flex items-center gap-3 px-1 py-2 hover:bg-fm-mist/60"><Icon name="check" className="h-4 w-4 text-fm-accent" /><span className="min-w-0 flex-1 text-sm">Livrări de verificat</span><b className="text-sm">{activeEngagements.filter((e) => e.status === 'DELIVERED').length}</b></Link></li>}
       </ul> },
-      projects: { title: 'Proiectele tale', meta: 'Vezi toate', to: '/projects/mine', body: projectRows.length ? <ul className="grid gap-4">{projectRows.slice(0, 3).map((p) => <li key={p.id}><Link to={`/projects/${p.id}`} className="block truncate text-sm font-semibold text-fm-ink hover:underline">{p.title}</Link><p className="mt-1 text-xs text-fm-slate/65">{p.status === 'OPEN' ? 'Deschis' : p.status === 'DELIVERED' ? 'Livrare de verificat' : 'În lucru'} · {p.interestedCount || 0} interesați</p></li>)}</ul> : <div className="text-sm text-fm-slate/70"><p>Nu ai proiecte încă.</p><Link to="/projects/new" className="mt-2 inline-flex font-semibold text-fm-accent hover:underline">Postează un proiect</Link></div> },
+      projects: { title: 'Proiectele tale', meta: 'Vezi toate', to: '/projects/mine', body: projectRows.length ? <ul className="grid gap-4">{projectRows.slice(0, 3).map((p) => <li key={p.id}><Link to={`/projects/${p.id}`} className="block truncate text-sm font-semibold text-fm-ink hover:underline">{p.title}</Link><p className="mt-1 text-xs text-fm-slate/65">{PROJECT_STATUS[p.status] || p.status} · {p.interestedCount || 0} interesați</p></li>)}</ul> : <div className="text-sm text-fm-slate/70"><p>Nu ai proiecte încă.</p><Link to="/projects/new" className="mt-2 inline-flex font-semibold text-fm-accent hover:underline">Postează un proiect</Link></div> },
       profile: { title: 'Profil freelancer', meta: `${completion}%`, to: '/profile/edit', body: <><Progress value={completion} /><p className="mt-2 text-xs text-fm-slate/70">{completion < 100 ? 'Adaugă detalii și exemple de lucru pentru un profil complet.' : 'Profil complet.'}</p>{tier.data && <p className="mt-3 text-xs text-fm-slate/65">Treapta {({ START: 'Start', VERIFIED: 'Verificat', PROVEN: 'Încercat', EXPERT: 'Expert' })[tier.data.tier] || tier.data.tier} · {tier.data.completedCount || 0} proiecte finalizate</p>}</> },
       matches: { title: 'Potriviri recente', meta: 'Deschide', to: '/recommendations', body: matchRows.length ? <ul className="grid gap-3">{matchRows.slice(0, 3).map((m) => <li key={m.id}><Link to={`/projects/${m.project?.id}`} className="block text-sm font-semibold text-fm-ink hover:underline">{m.project?.title || 'Proiect potrivit'}</Link><p className="mt-1 text-xs text-fm-slate/65">{m.score}% · {m.project?.client?.name || 'Client'}</p></li>)}</ul> : <p className="text-sm text-fm-slate/65">Nu ai potriviri noi.</p> },
       activity: { title: 'Colaborări active', meta: 'Vezi toate', to: '/engagements', body: activeEngagements.length ? <ul className="grid gap-3">{activeEngagements.slice(0, 3).map((e) => <li key={e.id}><Link to={`/engagements/${e.id}`} className="block truncate text-sm font-semibold text-fm-ink hover:underline">{e.project?.title || e.title}</Link><p className="mt-1 text-xs text-fm-slate/65">{e.status === 'DELIVERED' ? 'Livrat · așteaptă confirmarea' : 'În lucru'}</p></li>)}</ul> : <p className="text-sm text-fm-slate/65">Nu ai colaborări active.</p> },

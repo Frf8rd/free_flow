@@ -244,7 +244,7 @@ r('POST', '/freelancers/me/portfolio', ({ me, body }) => {
 });
 r('PATCH', '/freelancers/me/portfolio/:id', ({ me, params, body }) => { const f = FPofUser(me.id); const it = f?.portfolio.find((x) => x.id === params.id); if (!it) throw notFound(); Object.assign(it, body); return it; });
 r('DELETE', '/freelancers/me/portfolio/:id', ({ me, params }) => { const f = FPofUser(me.id); if (!f) throw notFound(); f.portfolio = f.portfolio.filter((x) => x.id !== params.id); return [204, null]; });
-r('GET', '/freelancers/:id/reviews', ({ params, query }) => { const f = FP(params.id); if (!f) throw notFound(); return paginate(reviewsOf(f), query); });
+r('GET', '/freelancers/:id/reviews', ({ params, query }) => { const f = FP(params.id); if (!f) throw notFound(); return { ...paginate(reviewsOf(f), query), averageRating: rating(f).ratingAvg }; });
 r('GET', '/freelancers/:id', ({ params }) => { const f = FP(params.id); if (!f || !f.onboarded) throw notFound('Profilul nu există sau nu mai este public.'); return freelancerDto(f, true); });
 
 // clients
@@ -289,6 +289,15 @@ r('PATCH', '/projects/:id', ({ me, params, body }) => {
   const retrigger = ['description', 'categoryId', 'budgetMin', 'budgetMax', 'skillIds'].some((k) => body[k] !== undefined);
   Object.assign(p, body); if (retrigger) p.matchedAt = nowIso(); return projectDto(p, me);
 });
+r('PATCH', '/projects/:id/close', ({ me, params }) => {
+  need(me, 'CLIENT');
+  const project = PR(params.id);
+  if (!project) throw notFound();
+  if (project.clientId !== me.id) throw forbidden();
+  if (!['OPEN', 'CLOSED'].includes(project.status)) throw new HttpError(409, 'Acest proiect nu poate fi închis.', null, 'PROJECT_NOT_CLOSABLE');
+  project.status = 'CLOSED';
+  return projectDto(project, me);
+});
 r('DELETE', '/projects/:id', ({ me, params }) => { need(me); const p = PR(params.id); if (!p) throw notFound(); if (p.clientId !== me.id) throw forbidden(); db.projects = db.projects.filter((x) => x.id !== p.id); return [204, null]; });
 
 // matches
@@ -299,14 +308,14 @@ r('GET', '/matches/me', ({ me, query }) => {
   let items;
   if (me.role === 'FREELANCER') {
     const f = FPofUser(me.id); if (!f?.onboarded) return paginate([], query);
-    items = wanted === 'CLIENT_INVITED'
+    items = wanted === 'CLIENT_INVITED' || query.projectId
       ? db.matchStates.filter((s) => s.freelancerId === f.id && PR(s.projectId)?.status === 'OPEN')
       : db.projects.filter((p) => p.status === 'OPEN' && p.clientId !== me.id).map((p) => ({ p, ...scorePair(p, f) })).filter((x) => x.hit.length).sort((a, b) => b.score - a.score).slice(0, 12).map((x) => getState(x.p.id, f.id));
   } else {
     const mine = db.projects.filter((p) => p.clientId === me.id && (!query.projectId || p.id === query.projectId) && matchingStatus(p) === 'DONE');
     items = mine.flatMap((p) => computeFor(p).map((x) => getState(p.id, x.f.id)));
   }
-  items = items.filter((s) => (wanted ? s.status === wanted : s.status !== 'DISMISSED'));
+  items = items.filter((s) => (!query.projectId || s.projectId === query.projectId) && (wanted ? s.status === wanted : s.status !== 'DISMISSED'));
   const pg = paginate(items, query); return { ...pg, data: pg.data.map((s) => matchDto(s, me.role)) };
 });
 r('POST', '/matches/impressions', ({ me, body }) => { need(me, 'CLIENT'); (body.matchIds || []).forEach((id) => { const s = db.matchStates.find((m) => m.id === id); if (s) db.exposure[s.freelancerId] = (db.exposure[s.freelancerId] || 0) + 1; }); return [204, null]; });

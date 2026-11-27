@@ -51,6 +51,7 @@ export const useMyProjects = (enabled = true) => useQuery({ queryKey: ['projects
 export const useProject = (id) => useQuery({ queryKey: ['project', id], queryFn: () => projects.byId(id), enabled: !!id });
 export const useCreateProject = () => useInvalidating(projects.create, [['projects-me'], ['projects']]);
 export const useUpdateProject = () => useInvalidating(({ id, ...body }) => projects.update(id, body), [['projects-me'], ['projects'], ['project'], ['project-matches']]);
+export const useCloseProject = () => useInvalidating(projects.close, [['projects-me'], ['projects'], ['project'], ['project-matches'], ['matches-me'], ['counts']]);
 export const useDeleteProject = () => useInvalidating(projects.remove, [['projects-me'], ['projects']]);
 
 // Potrivirile unui proiect: se reinterogă la câteva secunde cât timp calculul nu s-a terminat (README 4.3)
@@ -63,7 +64,7 @@ export const useProjectMatches = (id, enabled = true) => useQuery({
 
 /* ---------- potriviri ---------- */
 export const useMyMatches = (params, enabled = true) => useQuery({ queryKey: ['matches-me', params], queryFn: () => matches.mine(params), enabled, placeholderData: keepPreviousData });
-const matchKeys = [['matches-me'], ['project-matches'], ['counts'], ['conversations'], ['notifications']];
+const matchKeys = [['matches-me'], ['project-matches'], ['project'], ['projects-me'], ['counts'], ['conversations'], ['notifications']];
 export const useInterest = () => useInvalidating(matches.interest, matchKeys);
 export const useInvite = () => useInvalidating(matches.invite, matchKeys);
 export const useInviteManual = () => useInvalidating(matches.inviteManual, matchKeys);
@@ -76,7 +77,7 @@ export const useEngagement = (id) => useQuery({ queryKey: ['engagement', id], qu
 const engKeys = [['engagements'], ['engagement'], ['conversations'], ['tier'], ['projects-me'], ['notifications']];
 export const useCreateEngagement = () => useInvalidating(engagements.create, engKeys);
 export const useEngagementStatus = () => useInvalidating(({ id, status, usedAi }) => engagements.setStatus(id, status, usedAi), engKeys);
-export const useReview = () => useInvalidating(({ id, ...body }) => engagements.review(id, body), [['engagement'], ['freelancer'], ['freelancer-reviews']]);
+export const useReview = () => useInvalidating(({ id, ...body }) => engagements.review(id, body), [['engagement'], ['freelancer'], ['freelancer-reviews'], ['freelancers']]);
 
 /* ---------- chat ---------- */
 export const useConversations = (enabled = true, realtime = false) => useQuery({

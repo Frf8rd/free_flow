@@ -79,8 +79,8 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectDetail />} />
       </Route>
       <Route element={<ProtectedRoute roles={['CLIENT']} />}>
-        <Route path="/projects/mine" element={<MyProjects />} />
-        <Route path="/projects/archive" element={<MyProjects archived />} />
+        <Route path="/projects/mine" element={<MyProjects key="active" />} />
+        <Route path="/projects/archive" element={<MyProjects key="archive" archived />} />
         <Route path="/projects/new" element={<ProjectForm />} />
         <Route path="/projects/:id/edit" element={<ProjectForm />} />
       </Route>

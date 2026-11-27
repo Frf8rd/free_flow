@@ -31,6 +31,7 @@ export function FreelancerMatchCard({ match, onInvite, onDismiss, onCompare, com
   const f = match.freelancer, r = match.reasons || {};
   const ref = useInView(() => onSeen?.(match.id));
   const canAct = match.status === 'SUGGESTED';
+  const canInvite = canAct || match.status === 'FREELANCER_INTERESTED';
   return (
     <Card hover className="p-5" ref={ref}>
       <div className="flex items-start gap-4">
@@ -50,8 +51,8 @@ export function FreelancerMatchCard({ match, onInvite, onDismiss, onCompare, com
       <div className="mt-4 flex flex-wrap gap-1.5">{f.skills?.slice(0, 5).map((s) => <Tag key={s.id}>{s.name}</Tag>)}</div>
       <div className="mt-4"><ScoreDetails components={r.components} /></div>
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-fm-ink/10 pt-4">
-        {match.conversationId ? <Link to={`/messages?c=${match.conversationId}`} className="inline-flex items-center gap-2 rounded-md bg-fm-accent-solid px-5 py-2.5 text-sm font-semibold text-white"><Icon name="chat" className="h-4 w-4" />Deschide discuția</Link>
-          : <Button loading={busy} onClick={() => onInvite(match)} className="!px-5 !py-2.5">Invită</Button>}
+        {canInvite && <Button loading={busy} onClick={() => onInvite(match)} className="!px-5 !py-2.5">Invită</Button>}
+        {match.conversationId && <Link to={`/messages?c=${match.conversationId}`} className="inline-flex items-center gap-2 rounded-md bg-fm-accent-solid px-5 py-2.5 text-sm font-semibold text-white"><Icon name="chat" className="h-4 w-4" />Deschide discuția</Link>}
         <Link to={`/freelancers/${f.id}`} className="rounded-md border border-fm-graphite/25 px-4 py-2.5 text-sm font-semibold text-fm-ink hover:bg-fm-mist/50">Vezi profilul</Link>
         {onCompare && <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm text-fm-slate/80"><input type="checkbox" checked={!!compared} onChange={() => onCompare(match)} className="h-4 w-4 accent-[rgb(var(--fm-accent-solid))]" />Compară</label>}
         {canAct && onDismiss && <button onClick={() => onDismiss(match)} className="text-sm font-medium text-fm-slate/60 hover:text-red-500">Ascunde</button>}

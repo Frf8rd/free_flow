@@ -4,6 +4,7 @@ const attachmentStorage = require("../utils/projectAttachmentStorage");
 const { enqueueMatchingJob } = require("./matching/jobs");
 
 const PROJECT_STATUSES = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED"]);
+const INTERESTED_MATCH_STATUSES = ["FREELANCER_INTERESTED", "ACCEPTED"];
 const projectInclude = {
   category: { select: { id: true, name: true } },
   client: { select: { id: true, name: true, avatarUrl: true, clientProfile: { select: { type: true, companyName: true } } } },
@@ -390,7 +391,7 @@ async function listProjects(query = {}, { clientId, db = prisma } = {}) {
   ]);
   const projectIds = data.map(({ id }) => id);
   const interested = projectIds.length && db.match?.groupBy
-    ? await db.match.groupBy({ by: ["projectId", "status"], where: { projectId: { in: projectIds }, status: { in: ["FREELANCER_INTERESTED", "CLIENT_INVITED", "ACCEPTED"] } }, _count: { _all: true } })
+    ? await db.match.groupBy({ by: ["projectId", "status"], where: { projectId: { in: projectIds }, status: { in: INTERESTED_MATCH_STATUSES } }, _count: { _all: true } })
     : [];
   const interestedByProject = new Map();
   for (const row of interested) interestedByProject.set(row.projectId, (interestedByProject.get(row.projectId) ?? 0) + row._count._all);
@@ -414,7 +415,11 @@ async function getProject(id, db = prisma, viewer = null) {
     });
     if (!participant) throw new AppError(404, "PROJECT_NOT_FOUND", "Proiectul nu a fost găsit.");
   }
-  return withImageUrls(project);
+  const { _count, ...data } = project;
+  const interestedCount = db.match?.count
+    ? await db.match.count({ where: { projectId: data.id, status: { in: INTERESTED_MATCH_STATUSES } } })
+    : 0;
+  return { ...withImageUrls(data), matchesCount: _count?.matches ?? 0, interestedCount };
 }
 
 module.exports = {

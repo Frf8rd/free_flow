@@ -33,7 +33,7 @@ function parseRate(value, field) {
   return parsed;
 }
 
-function toListItem({ _count, freelancerProfile: profile, ...user }) {
+function toListItem({ _count, freelancerProfile: profile, ...user }, reviews) {
   return {
     ...user,
     ...(profile ? {
@@ -44,6 +44,8 @@ function toListItem({ _count, freelancerProfile: profile, ...user }) {
       portfolio: profile.portfolio,
     } : {}),
     completedProjects: _count.freelancerEngagements,
+    reviewsCount: reviews?._count._all ?? 0,
+    ratingAvg: reviews?._avg.rating == null ? null : Math.round(reviews._avg.rating * 100) / 100,
   };
 }
 
@@ -84,7 +86,14 @@ async function searchFreelancers(query = {}, { db = prisma } = {}) {
     db.user.count({ where }),
     db.user.findMany({ where, select: freelancerSelect, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: (page - 1) * limit, take: limit }),
   ]);
-  return { data: rows.map(toListItem), page, limit, total };
+  const reviews = rows.length ? await db.review.groupBy({
+    by: ["targetId"],
+    where: { targetId: { in: rows.map(({ id }) => id) } },
+    _count: { _all: true },
+    _avg: { rating: true },
+  }) : [];
+  const reviewsByUser = new Map(reviews.map((row) => [row.targetId, row]));
+  return { data: rows.map((row) => toListItem(row, reviewsByUser.get(row.id))), page, limit, total };
 }
 
 module.exports = { searchFreelancers };

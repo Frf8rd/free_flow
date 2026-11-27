@@ -7,6 +7,7 @@ const matchInclude = {
   project: { include: { category: { select: { id: true, name: true } }, skills: { include: { skill: true } }, client: { select: { id: true, name: true, avatarUrl: true } } } },
   freelancer: { include: { user: { select: { id: true, name: true, avatarUrl: true } }, skills: { include: { skill: true } }, portfolio: true } },
 };
+const matchListInclude = { ...matchInclude, conversation: { select: { id: true } } };
 
 async function listMine(user, query = {}, db = prisma) {
   const page = Math.max(1, Number(query.page) || 1);
@@ -15,9 +16,11 @@ async function listMine(user, query = {}, db = prisma) {
   const status = query.status ? statusMap[query.status] ?? query.status : null;
   if (status && !['SUGGESTED', 'FREELANCER_INTERESTED', 'CLIENT_INVITED', 'ACCEPTED', 'DISMISSED'].includes(status)) throw new AppError(400, 'VALIDATION_ERROR', 'Filtrul status nu este valid.');
   const sideDismissalField = user.role === 'CLIENT' ? 'clientDismissedAt' : 'freelancerDismissedAt';
-  const where = user.role === 'CLIENT'
-    ? { project: { clientId: user.id, status: 'OPEN' }, ...(query.projectId ? { projectId: query.projectId } : {}) }
-    : { freelancer: { userId: user.id }, project: { status: 'OPEN' } };
+  const where = {
+    project: { status: 'OPEN', ...(user.role === 'CLIENT' ? { clientId: user.id } : {}) },
+    ...(user.role === 'CLIENT' ? {} : { freelancer: { userId: user.id } }),
+    ...(query.projectId ? { projectId: query.projectId } : {}),
+  };
   if (status === 'DISMISSED') {
     where.AND = [{ OR: [{ status: 'DISMISSED' }, { [sideDismissalField]: { not: null } }] }];
   } else {
@@ -26,7 +29,7 @@ async function listMine(user, query = {}, db = prisma) {
   }
   const [total, data] = await Promise.all([
     db.match.count({ where }),
-    db.match.findMany({ where, include: matchInclude, orderBy: user.role === 'CLIENT' ? [{ projectRank: 'asc' }, { score: 'desc' }] : [{ freelancerRank: 'asc' }, { score: 'desc' }], skip: (page - 1) * limit, take: limit }),
+    db.match.findMany({ where, include: matchListInclude, orderBy: user.role === 'CLIENT' ? [{ projectRank: 'asc' }, { score: 'desc' }] : [{ freelancerRank: 'asc' }, { score: 'desc' }], skip: (page - 1) * limit, take: limit }),
   ]);
   return { data: data.map((match) => ({ ...match, freelancer: { ...match.freelancer, ...match.freelancer.user, user: undefined } })), page, limit, total };
 }
@@ -38,7 +41,7 @@ async function listForProject(user, projectId, db = prisma) {
   });
   if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
   if (project.clientId !== user.id) throw new AppError(403, 'FORBIDDEN', 'Poți vedea potrivirile doar pentru proiectele tale.');
-  const data = await db.match.findMany({ where: { projectId, clientDismissedAt: null, status: { not: 'DISMISSED' } }, include: matchInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
+  const data = await db.match.findMany({ where: { projectId, clientDismissedAt: null, status: { not: 'DISMISSED' } }, include: matchListInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
   const extracted = project.extracted && typeof project.extracted === 'object' ? project.extracted : {};
   return {
     status: project.matchingStatus || 'PENDING',
