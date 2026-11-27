@@ -3,6 +3,7 @@ const { AppError } = require("../utils/errors");
 
 // Parametrii necunoscuți din query sunt ignorați (ex. un cache-buster adăugat de frontend).
 const listQuerySchema = z.object({
+  kind: z.enum(["matches", "messages", "engagements"]).optional(),
   unread: z
     .enum(["true", "false"], { error: "Parametrul unread trebuie să fie true sau false." })
     .optional(),

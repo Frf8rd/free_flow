@@ -21,6 +21,12 @@ const TYPES = {
   NEW_MESSAGE: "NEW_MESSAGE",
 };
 
+const GROUPS = {
+  matches: ["NEW_MATCH", "MATCH_INVITE", "MATCH_INTEREST", "INVITED", "FREELANCER_INTERESTED"],
+  messages: [TYPES.NEW_MESSAGE],
+  engagements: ["ENGAGEMENT_STARTED", "REVIEW_RECEIVED", ...Object.values(TYPES).filter((type) => type.startsWith("ENGAGEMENT_"))],
+};
+
 const notificationSelect = {
   id: true,
   type: true,
@@ -60,8 +66,8 @@ async function createNotification({ userId, type, title, body = "", data = null,
 }
 
 async function listNotifications(userId, query = {}, db = prisma) {
-  const { unread, page = 1, limit = 20 } = parse(listQuerySchema, query);
-  const where = { userId, ...(unread === "true" ? { readAt: null } : {}) };
+  const { kind, unread, page = 1, limit = 20 } = parse(listQuerySchema, query);
+  const where = { userId, ...(unread === "true" ? { readAt: null } : {}), ...(kind ? { type: { in: GROUPS[kind] } } : {}) };
 
   const [total, unreadCount, data] = await Promise.all([
     db.notification.count({ where }),

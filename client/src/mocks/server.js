@@ -1,4 +1,5 @@
 import { seed } from './seed.js';
+import { notificationDetails } from '../lib/notifications.js';
 
 const KEY = 'fm-mock-db-v1';
 let db;
@@ -384,7 +385,12 @@ r('POST', '/conversations/:id/messages', ({ me, params, body }) => {
 r('PATCH', '/conversations/:id/read', ({ me, params }) => { need(me); const c = myConvs(me).find((x) => x.id === params.id); if (!c) throw notFound(); c.reads[me.id] = Date.now() + 1; return { ok: true }; });
 
 // notifications
-r('GET', '/notifications', ({ me, query }) => { need(me); let l = db.notifications.filter((n) => n.userId === me.id); if (query.unread === 'true' || query.unread === true) l = l.filter((n) => !n.isRead); return paginate(l.map(({ userId, ...n }) => n), query); });
+r('GET', '/notifications', ({ me, query }) => {
+  need(me);
+  const unread = query.unread === 'true' || query.unread === true;
+  const rows = db.notifications.filter((n) => n.userId === me.id && (!unread || !n.isRead) && (!query.kind || notificationDetails(n).kind === query.kind));
+  return paginate(rows.map(({ userId, ...n }) => n), query);
+});
 r('PATCH', '/notifications/read-all', ({ me }) => { need(me); db.notifications.forEach((n) => { if (n.userId === me.id) n.isRead = true; }); return { ok: true }; });
 r('PATCH', '/notifications/:id/read', ({ me, params }) => { need(me); const n = db.notifications.find((x) => x.id === params.id && x.userId === me.id); if (!n) throw notFound(); n.isRead = true; return { ok: true }; });
 
