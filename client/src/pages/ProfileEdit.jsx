@@ -25,7 +25,12 @@ function WorkSamples({ items = [] }) {
   const { toast, error } = useToast();
   const save = async () => {
     if (!draft?.title?.trim()) return;
-    const body = { title: draft.title.trim(), description: draft.description || '', imageUrl: draft.imageUrl || '', link: draft.link || '' };
+    const body = {
+      title: draft.title.trim(),
+      description: draft.description || '',
+      imageUrl: draft.imageUrl?.trim() || null,
+      link: draft.link?.trim() || null,
+    };
     try {
       if (draft.id) await update.mutateAsync({ id: draft.id, ...body }); else await add.mutateAsync(body);
       setDraft(null); toast('Lucrarea a fost salvată.');
@@ -35,7 +40,7 @@ function WorkSamples({ items = [] }) {
   return <SectionCard title="Portofoliu" subtitle="Adaugă exemple de lucru cu imagini și linkuri relevante." action={!draft && <Button variant="outline" onClick={() => setDraft({ ...blankWork })}><Icon name="plus" className="h-4 w-4" />Adaugă lucrare</Button>}>
     {draft && <div className="mb-5 grid gap-4 border border-fm-ink/10 bg-fm-snow p-4 sm:grid-cols-2">
       <Field label="Titlu"><Text value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} maxLength={120} /></Field>
-      <Field label="Link către lucrare" optional><Text type="url" value={draft.link} onChange={(e) => setDraft({ ...draft, link: e.target.value })} placeholder="https://…" /></Field>
+      <Field label="Link către lucrare" optional><Text type="url" value={draft.link ?? ''} onChange={(e) => setDraft({ ...draft, link: e.target.value })} placeholder="https://…" /></Field>
       <Field label="Descriere" optional className="sm:col-span-2"><Textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} maxLength={1000} /></Field>
       <Field label="Imagine" optional className="sm:col-span-2"><ImageUpload value={draft.imageUrl} onChange={(imageUrl) => setDraft({ ...draft, imageUrl })} purpose="portfolio" /></Field>
       <div className="flex justify-end gap-2 sm:col-span-2"><Button variant="outline" onClick={() => setDraft(null)}>Renunță</Button><Button onClick={save} loading={add.isPending || update.isPending}>Salvează</Button></div>
