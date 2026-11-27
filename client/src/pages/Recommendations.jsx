@@ -6,8 +6,9 @@ import Icon from '../components/ui/Icon.jsx';
 import { Async, Card, Empty, Notice } from '../components/ui/Kit.jsx';
 import { Select } from '../components/ui/Fields.jsx';
 import { FreelancerMatchCard, ProjectMatchCard } from '../components/match/Cards.jsx';
-import { useMyProjects, useProjectMatches, useMyMatches, useInvite, useInterest, useDismiss, useRefreshMatches } from '../hooks/queries.js';
+import { useMyProjects, useProjectMatches, useMyMatches, useMyFreelancer, useInvite, useInterest, useDismiss, useRefreshMatches } from '../hooks/queries.js';
 import useImpressions from '../hooks/useImpressions.js';
+import { profileCompleteness } from '../lib/profile.js';
 import { useSession } from '../lib/session.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 
@@ -22,11 +23,13 @@ export default function Recommendations() {
   const selected = clientProjects.find((p) => String(p.id) === projectId) || clientProjects[0];
   const clientMatches = useProjectMatches(selected?.id, isClient);
   const freelancerMatches = useMyMatches({ status: 'new', page: 1, limit: 20 }, !isClient);
+  const freelancerProfile = useMyFreelancer(!isClient);
   const invite = useInvite(), interest = useInterest(), dismiss = useDismiss(), refresh = useRefreshMatches();
   const track = useImpressions();
   const { toast, error } = useToast();
   const result = isClient ? clientMatches : freelancerMatches;
   const rows = isClient ? (clientMatches.data?.data || []) : (freelancerMatches.data?.data || []);
+  const showProfileHint = !isClient && freelancerProfile.isSuccess && profileCompleteness(freelancerProfile.data).percent < 100;
 
   useEffect(() => {
     if (selected && String(selected.id) !== projectId) setProjectId(String(selected.id));
@@ -45,7 +48,16 @@ export default function Recommendations() {
       {isClient && selected && clientMatches.data?.analysis?.questions?.length > 0 && <Notice tone="info" icon="info"><b>Detalii care pot îmbunătăți potrivirea</b><ul className="mt-2 list-disc pl-5">{clientMatches.data.analysis.questions.map((question) => <li key={question}>{question}</li>)}</ul></Notice>}
       {isClient && selected && ['PENDING', 'RUNNING'].includes(clientMatches.data?.status) && <Card className="p-4 text-sm text-fm-slate/75"><span className="mr-2 inline-block h-3 w-3 animate-spin border-2 border-fm-graphite/25 border-t-fm-accent" />Se caută freelanceri potriviți. Lista se actualizează automat.</Card>}
       {isClient && clientMatches.data?.status === 'FAILED' && <Card><Empty icon="alert" title="Potrivirile nu au putut fi calculate" text="Poți încerca din nou după ce verifici detaliile proiectului." /></Card>}
-      <Async q={result}>{() => rows.length === 0 ? <Card><Empty icon="sparkle" title={isClient ? 'Nicio potrivire afișată încă' : 'Nu ai potriviri noi'} text={isClient ? 'Lasă sistemului câteva momente să proceseze proiectul.' : 'Completează-ți profilul și adaugă abilități ca să primești proiecte potrivite.'} action={!isClient && <Link to="/profile/edit" className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">Editează profilul</Link>} /></Card> : <div className="grid gap-3">{rows.map((match) => isClient ? <FreelancerMatchCard key={match.id} match={match} onSeen={track} onInvite={(m) => act(invite, m.id, 'Invitația a fost trimisă.', true)} onDismiss={(m) => act(dismiss, { id: m.id, reason: '' }, 'Potrivirea a fost ascunsă.')} busy={invite.isPending} /> : <ProjectMatchCard key={match.id} match={match} onSeen={track} onInterest={(m) => act(interest, m.id, 'Interesul a fost trimis.', true)} onDismiss={(m) => act(dismiss, { id: m.id, reason: '' }, 'Potrivirea a fost ascunsă.')} busy={interest.isPending} />)}</div>}</Async>
+      <Async q={result}>{() => rows.length === 0 ? <Card><Empty
+        icon="sparkle"
+        title={isClient ? 'Nicio potrivire afișată încă' : 'Nu ai potriviri noi'}
+        text={isClient
+          ? 'Lasă sistemului câteva momente să proceseze proiectul.'
+          : showProfileHint
+            ? 'Poți completa abilitățile și exemplele de lucru pentru a îmbunătăți recomandările.'
+            : 'Momentan nu sunt recomandări noi pentru profilul tău. Poți căuta proiecte deschise în catalog.'}
+        action={!isClient && <Link to={showProfileHint ? '/profile/edit' : '/browse'} className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">{showProfileHint ? 'Editează profilul' : 'Explorează proiecte'}</Link>}
+      /></Card> : <div className="grid gap-3">{rows.map((match) => isClient ? <FreelancerMatchCard key={match.id} match={match} onSeen={track} onInvite={(m) => act(invite, m.id, 'Invitația a fost trimisă.', true)} onDismiss={(m) => act(dismiss, { id: m.id, reason: '' }, 'Potrivirea a fost ascunsă.')} busy={invite.isPending} /> : <ProjectMatchCard key={match.id} match={match} onSeen={track} onInterest={(m) => act(interest, m.id, 'Interesul a fost trimis.', true)} onDismiss={(m) => act(dismiss, { id: m.id, reason: '' }, 'Potrivirea a fost ascunsă.')} busy={interest.isPending} />)}</div>}</Async>
     </div>
   </PageShell>;
 }

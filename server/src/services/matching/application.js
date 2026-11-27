@@ -259,7 +259,7 @@ async function matchProjectsForFreelancer(userId, db = prisma) {
       budgetMin: project.budgetMin, budgetMax: project.budgetMax, deadline: project.deadline,
       requiredLevel: 'BEGINNER', size: 'MEDIUM', language: null, estimatedHours: null,
     });
-  }), {
+  }), MATCHING_CONFIG, {
     seed: new Date().toISOString().slice(0, 10),
     exposureById: Object.fromEntries(projects.map((project) => [project.id, exposures.get(project.id) ?? { exposure: 0, lastExposureAt: null }])),
   });
