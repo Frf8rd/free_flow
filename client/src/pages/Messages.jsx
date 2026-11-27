@@ -67,7 +67,7 @@ export default function Messages() {
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-fm-ink">{active.name}</p><p className="truncate text-xs text-fm-slate/60">{active.project}</p></div>
               <div className="ml-auto shrink-0"><StartEngagement conversation={active} /></div>
             </header>
-            <ChatThread conv={active} className="flex-1" />
+            <ChatThread key={active.id} conv={active} className="flex-1" />
           </section>
         ) : <section className="hidden place-items-center lg:grid"><p className="text-sm text-fm-slate/60">Conversația nu există.</p></section>}
 

@@ -65,7 +65,10 @@ export function ChatProvider({ children }) {
       timeout: 10000,
     });
     socketRef.current = socket;
-    socket.on('connect', () => setConnected(true));
+    socket.on('connect', () => {
+      setConnected(true);
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+    });
     let refreshing = false;
     const renewAndReconnect = async () => {
       if (refreshing) return;
@@ -95,6 +98,7 @@ export function ChatProvider({ children }) {
     });
     for (const event of ['notification:new', 'engagement:new', 'engagement:updated', 'projects:new']) {
       socket.on(event, () => {
+        if (event !== 'projects:new') qc.invalidateQueries({ queryKey: ['conversations'] });
         qc.invalidateQueries({ queryKey: ['notifications'] });
         qc.invalidateQueries({ queryKey: ['engagements'] });
         qc.invalidateQueries({ queryKey: ['projects'] });

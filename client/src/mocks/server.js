@@ -120,7 +120,11 @@ function ensureConversation(match, clientUserId, freelancerUserId) {
 const convDto = (c, me) => {
   const otherId = c.userIds.find((i) => i !== me.id), o = U(otherId), last = c.messages[c.messages.length - 1];
   const readAt = c.reads[me.id] || 0;
-  return { id: c.id, projectId: c.projectId, project: { id: c.projectId, title: PR(c.projectId)?.title }, matchId: c.matchId, engagementId: db.engagements.find((e) => e.matchId === c.matchId)?.id || null,
+  const project = PR(c.projectId);
+  const engagement = db.engagements.find((e) => e.matchId === c.matchId);
+  const match = db.matchStates.find((m) => m.id === c.matchId);
+  return { id: c.id, projectId: c.projectId, project: { id: c.projectId, title: project?.title }, matchId: c.matchId, engagementId: engagement?.id || null,
+    clientId: project?.clientId, freelancerId: c.userIds.find((id) => id !== project?.clientId), engagementStatus: engagement?.status ?? null, matchStatus: match?.status ?? null,
     other: { id: o.id, name: o.name, avatarUrl: o.avatarUrl, role: o.role, profileId: FPofUser(o.id)?.id || null }, lastMessage: last ? { content: last.content, createdAt: last.createdAt, senderId: last.senderId } : null,
     unreadCount: c.messages.filter((m) => m.senderId !== me.id && new Date(m.createdAt).getTime() > readAt).length, updatedAt: c.updatedAt };
 };
