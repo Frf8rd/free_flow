@@ -7,15 +7,15 @@ import { useEngagements } from '../hooks/queries.js';
 import { useAuth } from '../store/authStore.js';
 import { ENGAGEMENT_STATUS, formatDate } from '../lib/format.js';
 
-const filters = [null, 'IN_PROGRESS', 'DELIVERED', 'COMPLETED', 'CANCELLED'];
-const labels = ['Toate', 'În lucru', 'Livrate', 'Finalizate', 'Anulate'];
-export const statusTone = { IN_PROGRESS: 'accent', DELIVERED: 'warn', COMPLETED: 'success', CANCELLED: 'danger' };
+const filters = [null, 'PENDING', 'IN_PROGRESS', 'DELIVERED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const labels = ['Toate', 'În așteptare', 'În lucru', 'Livrate', 'Finalizate', 'Refuzate', 'Anulate'];
+export const statusTone = { PENDING: 'warn', IN_PROGRESS: 'accent', DELIVERED: 'warn', COMPLETED: 'success', REJECTED: 'danger', CANCELLED: 'danger' };
 
 export default function Engagements() {
   const user = useAuth((s) => s.user);
   const query = useEngagements();
   const [tab, setTab] = useState(0);
-  return <PageShell title="Colaborări" subtitle="Urmărește stadiul lucrărilor începute după o potrivire acceptată.">
+  return <PageShell title="Colaborări" subtitle="Vezi propunerile și urmărește stadiul lucrărilor.">
     <Async q={query}>{(items) => {
       const counts = filters.map((status) => items.filter((e) => !status || e.status === status).length);
       const rows = items.filter((e) => !filters[tab] || e.status === filters[tab]);

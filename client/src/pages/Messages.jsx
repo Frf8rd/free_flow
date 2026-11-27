@@ -65,7 +65,7 @@ export default function Messages() {
               <button onClick={() => navigate('/messages')} aria-label="Înapoi la conversații" className="grid h-10 w-10 place-items-center rounded-md border border-fm-graphite/15 text-fm-ink hover:bg-fm-mist/50 lg:hidden"><Icon name="chevronLeft" className="h-5 w-5" /></button>
               <Avatar initials={active.initials} tone={active.tone} />
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-fm-ink">{active.name}</p><p className="truncate text-xs text-fm-slate/60">{active.project}</p></div>
-              <div className="ml-auto shrink-0"><StartEngagement conversation={active} /></div>
+              <div className="ml-auto shrink-0"><StartEngagement key={active.id} conversation={active} /></div>
             </header>
             <ChatThread key={active.id} conv={active} className="flex-1" />
           </section>

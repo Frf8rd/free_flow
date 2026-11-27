@@ -124,8 +124,10 @@ const convDto = (c, me) => {
   const project = PR(c.projectId);
   const engagement = db.engagements.find((e) => e.matchId === c.matchId);
   const match = db.matchStates.find((m) => m.id === c.matchId);
-  return { id: c.id, projectId: c.projectId, project: { id: c.projectId, title: project?.title }, matchId: c.matchId, engagementId: engagement?.id || null,
-    clientId: project?.clientId, freelancerId: c.userIds.find((id) => id !== project?.clientId), engagementStatus: engagement?.status ?? null, matchStatus: match?.status ?? null,
+  const attached = engagement && !['PENDING', 'REJECTED'].includes(engagement.status);
+  return { id: c.id, projectId: c.projectId, project: { id: c.projectId, title: project?.title, status: project?.status }, matchId: c.matchId, engagementId: attached ? engagement.id : null,
+    clientId: project?.clientId, freelancerId: c.userIds.find((id) => id !== project?.clientId), engagementStatus: attached ? engagement.status : null, matchStatus: match?.status ?? null,
+    proposalId: engagement?.status === 'PENDING' ? engagement.id : null,
     other: { id: o.id, name: o.name, avatarUrl: o.avatarUrl, role: o.role, profileId: FPofUser(o.id)?.id || null }, lastMessage: last ? { content: last.content, createdAt: last.createdAt, senderId: last.senderId } : null,
     unreadCount: c.messages.filter((m) => m.senderId !== me.id && new Date(m.createdAt).getTime() > readAt).length, updatedAt: c.updatedAt };
 };
@@ -134,8 +136,8 @@ const engDto = (e) => {
   const p = PR(e.projectId), f = FP(e.freelancerId), c = U(p.clientId);
   const conv = db.conversations.find((x) => x.matchId === e.matchId);
   return { id: e.id, matchId: e.matchId, agreedPrice: e.agreedPrice, deadline: e.deadline || null, status: e.status, usedAi: e.usedAi ?? null, createdAt: e.createdAt, completedAt: e.completedAt || null,
-    project: { id: p.id, title: p.title }, client: { userId: c.id, name: c.name, avatarUrl: c.avatarUrl }, freelancer: { userId: f.userId, profileId: f.id, name: U(f.userId).name, avatarUrl: U(f.userId).avatarUrl, title: f.title },
-    reviews: e.reviews || [], conversationId: conv?.id || null };
+    project: { id: p.id, title: p.title, status: p.status }, client: { userId: c.id, name: c.name, avatarUrl: c.avatarUrl }, freelancer: { userId: f.userId, profileId: f.id, name: U(f.userId).name, avatarUrl: U(f.userId).avatarUrl, title: f.title },
+    reviews: e.reviews || [], conversationId: ['PENDING', 'REJECTED'].includes(e.status) ? null : conv?.id || null };
 };
 
 const paginate = (arr, q) => { const page = Math.max(1, +q.page || 1), limit = Math.min(100, +q.limit || 20); return { data: arr.slice((page - 1) * limit, page * limit), page, limit, total: arr.length }; };
@@ -337,14 +339,13 @@ r('POST', '/matches/:id/dismiss', ({ me, params }) => { need(me); const s = db.m
 
 // engagements
 r('POST', '/engagements', ({ me, body }) => {
-  need(me, 'CLIENT'); const s = db.matchStates.find((m) => m.id === body.matchId); if (!s) throw notFound();
-  const p = PR(s.projectId); if (p.clientId !== me.id) throw forbidden();
+  need(me, 'FREELANCER'); const s = db.matchStates.find((m) => m.id === body.matchId && FP(m.freelancerId)?.userId === me.id); if (!s) throw notFound();
+  const p = PR(s.projectId); if (p.status !== 'OPEN') throw new HttpError(409, 'Proiectul nu mai acceptă colaborări.', null, 'CONFLICT');
   if (!['CLIENT_INVITED', 'ACCEPTED', 'FREELANCER_INTERESTED'].includes(s.status)) throw new HttpError(409, 'Colaborarea se poate crea doar după invitație sau interes.', null, 'CONFLICT');
   if (db.engagements.some((e) => e.matchId === s.id && e.status !== 'CANCELLED')) throw new HttpError(409, 'Există deja o colaborare pentru această potrivire.', null, 'CONFLICT');
   if (!(body.agreedPrice > 0)) throw bad('Datele introduse nu sunt valide.', { agreedPrice: 'Prețul trebuie să fie pozitiv.' });
-  s.status = 'ACCEPTED'; p.status = 'IN_PROGRESS';
-  const e = { id: uid('e'), matchId: s.id, projectId: p.id, freelancerId: s.freelancerId, agreedPrice: body.agreedPrice, deadline: body.deadline || null, status: 'IN_PROGRESS', reviews: [], createdAt: nowIso() };
-  db.engagements.push(e); notify(FP(s.freelancerId).userId, 'ENGAGEMENT_STARTED', 'Colaborare începută', `Ai o colaborare nouă la „${p.title}".`, `/engagements/${e.id}`); return [201, engDto(e)];
+  const e = { id: uid('e'), matchId: s.id, projectId: p.id, freelancerId: s.freelancerId, agreedPrice: body.agreedPrice, deadline: body.deadline || null, status: 'PENDING', reviews: [], createdAt: nowIso() };
+  db.engagements.push(e); notify(p.clientId, 'ENGAGEMENT_REQUESTED', 'Propunere nouă de colaborare', `${me.name} a trimis o propunere pentru „${p.title}”.`, `/engagements/${e.id}`); return [201, engDto(e)];
 });
 const myEng = (me) => db.engagements.filter((e) => PR(e.projectId)?.clientId === me.id || FP(e.freelancerId)?.userId === me.id);
 r('GET', '/engagements/me', ({ me, query }) => { need(me); return myEng(me).filter((e) => !query.status || e.status === query.status).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(engDto); });
@@ -352,13 +353,17 @@ r('GET', '/engagements/:id', ({ me, params }) => { need(me); const e = myEng(me)
 r('PATCH', '/engagements/:id/status', ({ me, params, body }) => {
   need(me); const e = myEng(me).find((x) => x.id === params.id); if (!e) throw notFound(); const p = PR(e.projectId), f = FP(e.freelancerId);
   const isClient = p.clientId === me.id, to = body.status;
-  const ok = (to === 'DELIVERED' && !isClient && e.status === 'IN_PROGRESS') || (to === 'COMPLETED' && isClient && e.status === 'DELIVERED') || (to === 'CANCELLED' && ['IN_PROGRESS', 'DELIVERED'].includes(e.status));
+  const ok = (isClient && e.status === 'PENDING' && ['IN_PROGRESS', 'REJECTED'].includes(to)) || (to === 'DELIVERED' && !isClient && e.status === 'IN_PROGRESS') || (to === 'COMPLETED' && isClient && e.status === 'DELIVERED') || (to === 'CANCELLED' && ['IN_PROGRESS', 'DELIVERED'].includes(e.status));
   if (!ok) throw new HttpError(409, 'Această schimbare de stare nu este permisă.', null, 'CONFLICT');
+  if (to === 'IN_PROGRESS' && p.status !== 'OPEN') throw new HttpError(409, 'Proiectul nu mai acceptă colaborări.', null, 'CONFLICT');
   if (to === 'DELIVERED' && e.usedAi == null) throw bad('Înainte de livrare, declară dacă ai folosit AI.', { usedAi: 'Declarația este obligatorie.' });
   e.status = to; const other = isClient ? f.userId : p.clientId;
+  const match = db.matchStates.find((m) => m.id === e.matchId);
+  if (to === 'IN_PROGRESS') { p.status = 'IN_PROGRESS'; if (match) match.status = 'ACCEPTED'; }
+  if (match && ['REJECTED', 'CANCELLED'].includes(to)) match.status = 'DISMISSED';
   if (to === 'COMPLETED') { e.completedAt = nowIso(); f.completedCount += 1; p.status = 'COMPLETED'; }
   if (to === 'CANCELLED') p.status = 'OPEN';
-  notify(other, `ENGAGEMENT_${to}`, { DELIVERED: 'Lucrarea a fost livrată', COMPLETED: 'Colaborarea a fost finalizată', CANCELLED: 'Colaborarea a fost anulată' }[to], `„${p.title}"`, `/engagements/${e.id}`);
+  notify(other, to === 'IN_PROGRESS' ? 'ENGAGEMENT_ACCEPTED' : `ENGAGEMENT_${to}`, { IN_PROGRESS: 'Propunere acceptată', REJECTED: 'Propunere refuzată', DELIVERED: 'Lucrarea a fost livrată', COMPLETED: 'Colaborarea a fost finalizată', CANCELLED: 'Colaborarea a fost anulată' }[to], `„${p.title}"`, `/engagements/${e.id}`);
   return engDto(e);
 });
 r('PATCH', '/engagements/:id/ai-disclosure', ({ me, params, body }) => { need(me, 'FREELANCER'); const e = myEng(me).find((x) => x.id === params.id); if (!e) throw notFound(); e.usedAi = !!body.usedAi; return engDto(e); });

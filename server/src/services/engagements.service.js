@@ -121,7 +121,11 @@ async function updateEngagement(actor, id, status, db = prisma) {
       ...(status === "REJECTED" ? { rejectedAt: now } : {}),
       ...(status === "CANCELLED" ? { cancelledAt: now } : {}),
     };
-    const engagement = await tx.engagement.update({ where: { id }, data, include });
+    const changed = await tx.engagement.updateMany({ where: { id, status: item.status }, data });
+    if (changed.count !== 1) {
+      throw new AppError(409, "INVALID_ENGAGEMENT_TRANSITION", "Starea colaborării s-a schimbat. Reîncarcă pagina și încearcă din nou.");
+    }
+    const engagement = await tx.engagement.findUnique({ where: { id }, include });
     if (["REJECTED", "CANCELLED"].includes(status) && item.matchId) {
       await tx.match.update({ where: { id: item.matchId }, data: { status: "DISMISSED" } });
     }

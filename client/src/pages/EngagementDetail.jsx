@@ -16,6 +16,8 @@ const STEPS = [['IN_PROGRESS', 'În lucru'], ['DELIVERED', 'Livrat'], ['COMPLETE
 
 function Stepper({ status }) {
   if (status === 'CANCELLED') return <Notice tone="warn" icon="info">Colaborarea a fost anulată.</Notice>;
+  if (status === 'REJECTED') return <Notice tone="warn" icon="info">Clientul a refuzat propunerea.</Notice>;
+  if (status === 'PENDING') return null;
   const idx = STEPS.findIndex(([k]) => k === status);
   return (
     <ol className="flex items-center" aria-label="Etapele colaborării">
@@ -69,9 +71,19 @@ function Detail({ e }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="space-y-6">
         <Card className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><Link to={`/projects/${e.project.id}`} className="text-xl font-bold tracking-tight text-fm-ink hover:underline">{e.project.title}</Link><p className="mt-1 text-sm text-fm-slate/70">Început {timeAgo(e.createdAt)}</p></div><Status tone={statusTone[e.status]}>{ENGAGEMENT_STATUS[e.status]}</Status></div>
-          <div className="mt-6"><Stepper status={e.status} /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><Link to={`/projects/${e.project.id}`} className="text-xl font-bold tracking-tight text-fm-ink hover:underline">{e.project.title}</Link><p className="mt-1 text-sm text-fm-slate/70">Propus {timeAgo(e.createdAt)}</p></div><Status tone={statusTone[e.status]}>{ENGAGEMENT_STATUS[e.status]}</Status></div>
+          {e.status !== 'PENDING' && <div className="mt-6"><Stepper status={e.status} /></div>}
         </Card>
+
+        {e.status === 'PENDING' && (isClient ? (
+          <SectionCard title="Propunere de colaborare" subtitle="Verifică suma și termenul. Dacă accepți, proiectul trece în lucru.">
+            {e.project.status && e.project.status !== 'OPEN' && <Notice tone="warn" icon="info">Proiectul nu mai este deschis pentru colaborări noi.</Notice>}
+            <div className="flex flex-wrap gap-3">
+              <Button disabled={Boolean(e.project.status && e.project.status !== 'OPEN')} loading={setStatus.isPending} onClick={() => act('IN_PROGRESS', 'Propunerea a fost acceptată. Colaborarea a început.')}>Acceptă propunerea</Button>
+              <Button variant="outline" disabled={setStatus.isPending} onClick={() => setConfirm('reject')}>Refuză propunerea</Button>
+            </div>
+          </SectionCard>
+        ) : <Notice icon="clock">Propunerea a fost trimisă. Colaborarea începe după ce clientul o acceptă.</Notice>)}
 
         {e.status === 'IN_PROGRESS' && !isClient && (
           <SectionCard title="Gata de livrare?" subtitle="Declarația despre AI este obligatorie și vizibilă clientului">
@@ -115,6 +127,9 @@ function Detail({ e }) {
 
       <Modal open={confirm === 'cancel'} onClose={() => setConfirm(null)} title="Anulezi colaborarea?" footer={<><Button variant="outline" onClick={() => setConfirm(null)}>Nu, o păstrez</Button><Button loading={setStatus.isPending} onClick={() => act('CANCELLED', 'Colaborarea a fost anulată.')} className="!bg-red-600 hover:!bg-red-700">Da, anulează</Button></>}>
         <p className="text-sm text-fm-slate/80">Cealaltă parte va fi anunțată. Acțiunea nu poate fi anulată.</p>
+      </Modal>
+      <Modal open={confirm === 'reject'} onClose={() => setConfirm(null)} title="Refuzi propunerea?" footer={<><Button variant="outline" onClick={() => setConfirm(null)}>Înapoi</Button><Button loading={setStatus.isPending} onClick={() => act('REJECTED', 'Propunerea a fost refuzată.')}>Confirmă refuzul</Button></>}>
+        <p className="text-sm text-fm-slate/80">Freelancerul va primi o notificare.</p>
       </Modal>
     </div>
   );

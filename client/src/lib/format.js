@@ -46,6 +46,6 @@ export const TIER_ORDER = ['START', 'VERIFIED', 'PROVEN', 'EXPERT'];
 export const LEVELS = { BEGINNER: 'Începător', JUNIOR: 'Junior', MID: 'Mediu', SENIOR: 'Senior' };
 export const AVAILABILITY = { AVAILABLE: 'Disponibil', LIMITED: 'Disponibilitate limitată', UNAVAILABLE: 'Indisponibil' };
 export const PROJECT_STATUS = { OPEN: 'Deschis', IN_PROGRESS: 'În lucru', COMPLETED: 'Finalizat', CLOSED: 'Închis' };
-export const ENGAGEMENT_STATUS = { IN_PROGRESS: 'În lucru', DELIVERED: 'Livrat', COMPLETED: 'Finalizat', CANCELLED: 'Anulat' };
+export const ENGAGEMENT_STATUS = { PENDING: 'În așteptare', IN_PROGRESS: 'În lucru', DELIVERED: 'Livrat', COMPLETED: 'Finalizat', REJECTED: 'Refuzat', CANCELLED: 'Anulat' };
 export const ROLE_LABEL = { CLIENT: 'Client', FREELANCER: 'Freelancer', ADMIN: 'Administrator' };
 export const LANGUAGES = ['Română', 'Engleză', 'Rusă', 'Franceză', 'Germană', 'Italiană', 'Spaniolă'];

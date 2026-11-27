@@ -7,8 +7,8 @@ async function listConversations(userId, db = prisma) {
     where,
     include: {
       engagement: { select: { status: true, project: { select: { id: true, title: true } } } },
-      project: { select: { id: true, title: true } },
-      match: { select: { status: true } },
+      project: { select: { id: true, title: true, status: true } },
+      match: { select: { status: true, engagement: { select: { id: true, status: true } } } },
       client: { select: { id: true, name: true, avatarUrl: true, role: true } },
       freelancer: { select: { id: true, name: true, avatarUrl: true, role: true } },
       messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
@@ -21,6 +21,7 @@ async function listConversations(userId, db = prisma) {
     other: row.clientId === userId ? row.freelancer : row.client,
     engagementStatus: row.engagement?.status ?? null,
     matchStatus: row.match?.status ?? null,
+    proposalId: row.match?.engagement?.status === "PENDING" ? row.match.engagement.id : null,
     lastMessage: row.messages[0] || null,
     unreadCount: row._count.messages,
     messages: undefined,
