@@ -65,6 +65,7 @@ export function ProjectMatchCard({ match, onInterest, onDismiss, onSeen, busy })
   const p = match.project, r = match.reasons || {};
   const ref = useInView(() => onSeen?.(match.id));
   const days = daysUntil(p.deadline);
+  const canConfirm = ['SUGGESTED', 'CLIENT_INVITED'].includes(match.status);
   return (
     <Card hover className="p-5" ref={ref}>
       <div className="flex items-start gap-4">
@@ -78,15 +79,15 @@ export function ProjectMatchCard({ match, onInterest, onDismiss, onSeen, busy })
           </div>
           <p className="mt-1 text-sm text-fm-slate/70">{p.client?.name} · {formatBudget(p.budgetMin, p.budgetMax)}{days != null && days >= 0 ? ` · termen în ${days} zile` : ''}</p>
         </div>
-        <Score value={match.score} />
+        {r.source !== 'manual_invite' && <Score value={match.score} />}
       </div>
       <p className="mt-3 line-clamp-2 text-sm text-fm-slate/80">{p.description}</p>
       <Why items={r.forFreelancer} />
       <div className="mt-4 flex flex-wrap gap-1.5">{p.skills?.slice(0, 5).map((s) => <Tag key={s.id}>{s.name}</Tag>)}</div>
       <div className="mt-4"><ScoreDetails components={r.components} /></div>
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-fm-ink/10 pt-4">
-        {match.conversationId ? <Link to={`/messages?c=${match.conversationId}`} className="inline-flex items-center gap-2 rounded-md bg-fm-accent-solid px-5 py-2.5 text-sm font-semibold text-white"><Icon name="chat" className="h-4 w-4" />Deschide discuția</Link>
-          : <Button loading={busy} onClick={() => onInterest(match)} className="!px-5 !py-2.5">Sunt interesat</Button>}
+        {canConfirm && <Button loading={busy} onClick={() => onInterest(match)} className="!px-5 !py-2.5">{match.status === 'CLIENT_INVITED' ? 'Acceptă invitația' : 'Sunt interesat'}</Button>}
+        {!canConfirm && match.conversationId && <Link to={`/messages?c=${match.conversationId}`} className="inline-flex items-center gap-2 rounded-md bg-fm-accent-solid px-5 py-2.5 text-sm font-semibold text-white"><Icon name="chat" className="h-4 w-4" />Deschide discuția</Link>}
         <Link to={`/projects/${p.id}`} className="rounded-md border border-fm-graphite/25 px-4 py-2.5 text-sm font-semibold text-fm-ink hover:bg-fm-mist/50">Detalii proiect</Link>
         {match.status === 'SUGGESTED' && onDismiss && <button onClick={() => onDismiss(match)} className="ml-auto text-sm font-medium text-fm-slate/60 hover:text-red-500">Nu mă interesează</button>}
       </div>

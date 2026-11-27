@@ -101,7 +101,7 @@ function Detail({ e }) {
       <aside className="space-y-4">
         <Card className="p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-fm-slate/55">{isClient ? 'Freelancer' : 'Client'}</p>
-          <div className="flex items-center gap-3"><Avatar name={other.name} src={other.avatarUrl} size="h-11 w-11" /><div className="min-w-0"><p className="truncate font-semibold text-fm-ink">{other.name}</p>{isClient && <Link to={`/freelancers/${e.freelancer.profileId}`} className="text-xs font-semibold text-fm-accent hover:underline">Vezi profilul</Link>}</div></div>
+          <div className="flex items-center gap-3"><Avatar name={other.name} src={other.avatarUrl} size="h-11 w-11" /><div className="min-w-0"><p className="truncate font-semibold text-fm-ink">{other.name}</p>{isClient && <Link to={`/freelancers/${e.freelancer.profileId ?? e.freelancer.userId}`} className="text-xs font-semibold text-fm-accent hover:underline">Vezi profilul</Link>}</div></div>
           {e.conversationId && <Link to={`/messages?c=${e.conversationId}`} className="mt-4 flex items-center justify-center gap-2 rounded-md border border-fm-graphite/25 px-4 py-2.5 text-sm font-semibold text-fm-ink hover:bg-fm-mist/50"><Icon name="chat" className="h-4 w-4" />Deschide discuția</Link>}
         </Card>
         <Card className="p-5"><dl className="space-y-3 text-sm">

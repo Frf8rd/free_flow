@@ -23,6 +23,7 @@ export default function Recommendations() {
   const selected = clientProjects.find((p) => String(p.id) === projectId) || clientProjects[0];
   const clientMatches = useProjectMatches(selected?.id, isClient);
   const freelancerMatches = useMyMatches({ status: 'new', page: 1, limit: 20 }, !isClient);
+  const freelancerInvites = useMyMatches({ status: 'invited', page: 1, limit: 50 }, !isClient);
   const freelancerProfile = useMyFreelancer(!isClient);
   const invite = useInvite(), interest = useInterest(), dismiss = useDismiss(), refresh = useRefreshMatches();
   const track = useImpressions();
@@ -44,6 +45,13 @@ export default function Recommendations() {
   const title = isClient ? 'Freelanceri potriviți' : 'Potriviri pentru tine';
   return <PageShell title={title} subtitle={isClient ? 'Primești o listă scurtă, cu explicații pentru fiecare recomandare.' : 'Proiectele sunt selectate după abilități, nivel, disponibilitate și buget.'} action={isClient && selected && <Button variant="outline" onClick={refreshMatches} loading={refresh.isPending}><Icon name="repeat" className="h-4 w-4" />Actualizează potrivirile</Button>}>
     <div className="grid gap-4">
+      {!isClient && <Async q={freelancerInvites}>{({ data }) => data.length > 0 && (
+        <section className="grid gap-3" aria-labelledby="received-invites">
+          <h2 id="received-invites" className="text-lg font-semibold text-fm-ink">Invitații primite</h2>
+          {data.map((match) => <ProjectMatchCard key={match.id} match={match} onInterest={(m) => act(interest, m.id, 'Invitația a fost acceptată.', true)} busy={interest.isPending} />)}
+        </section>
+      )}</Async>}
+      {!isClient && freelancerInvites.data?.data.length > 0 && <h2 className="text-lg font-semibold text-fm-ink">Recomandări noi</h2>}
       {isClient && <Async q={projects}>{() => clientProjects.length ? <Card className="flex flex-wrap items-center gap-3 p-4"><label className="min-w-52 flex-1 text-sm font-semibold text-fm-ink">Proiect<Select className="mt-1.5" value={selected?.id || ''} onChange={(event) => changeProject(event.target.value)} options={clientProjects.map((p) => ({ value: p.id, label: p.title }))} /></label><Link to="/projects/mine" className="pt-5 text-sm font-semibold text-fm-accent hover:underline">Gestionează proiectele</Link></Card> : <Card><Empty icon="folder" title="Postează un proiect pentru a vedea potriviri" text="După publicare, sistemul caută freelanceri potriviți." action={<Link to="/projects/new" className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">Postează proiect</Link>} /></Card>}</Async>}
       {isClient && selected && clientMatches.data?.analysis?.questions?.length > 0 && <Notice tone="info" icon="info"><b>Detalii care pot îmbunătăți potrivirea</b><ul className="mt-2 list-disc pl-5">{clientMatches.data.analysis.questions.map((question) => <li key={question}>{question}</li>)}</ul></Notice>}
       {isClient && selected && ['PENDING', 'RUNNING'].includes(clientMatches.data?.status) && <Card className="p-4 text-sm text-fm-slate/75"><span className="mr-2 inline-block h-3 w-3 animate-spin border-2 border-fm-graphite/25 border-t-fm-accent" />Se caută freelanceri potriviți. Lista se actualizează automat.</Card>}

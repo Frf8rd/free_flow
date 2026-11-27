@@ -69,7 +69,13 @@ async function getEngagement(user, id, db = prisma) {
     id,
     ...(user.role === "CLIENT" ? { clientId: user.id } : { freelancerId: user.id }),
   };
-  const engagement = await db.engagement.findFirst({ where, include });
+  const engagement = await db.engagement.findFirst({
+    where,
+    include: {
+      ...include,
+      reviews: { orderBy: { createdAt: "desc" }, select: { id: true, authorId: true, rating: true, comment: true, createdAt: true } },
+    },
+  });
   if (!engagement) throw new AppError(404, "ENGAGEMENT_NOT_FOUND", "Colaborarea nu a fost găsită.");
   return engagement;
 }

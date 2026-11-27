@@ -291,11 +291,14 @@ r('DELETE', '/projects/:id', ({ me, params }) => { need(me); const p = PR(params
 // matches
 r('GET', '/matches/me', ({ me, query }) => {
   need(me, 'CLIENT', 'FREELANCER');
-  const wanted = query.status === 'new' ? 'SUGGESTED' : query.status;
+  const statuses = { new: 'SUGGESTED', invited: 'CLIENT_INVITED' };
+  const wanted = statuses[query.status] ?? query.status;
   let items;
   if (me.role === 'FREELANCER') {
     const f = FPofUser(me.id); if (!f?.onboarded) return paginate([], query);
-    items = db.projects.filter((p) => p.status === 'OPEN' && p.clientId !== me.id).map((p) => ({ p, ...scorePair(p, f) })).filter((x) => x.hit.length).sort((a, b) => b.score - a.score).slice(0, 12).map((x) => getState(x.p.id, f.id));
+    items = wanted === 'CLIENT_INVITED'
+      ? db.matchStates.filter((s) => s.freelancerId === f.id && PR(s.projectId)?.status === 'OPEN')
+      : db.projects.filter((p) => p.status === 'OPEN' && p.clientId !== me.id).map((p) => ({ p, ...scorePair(p, f) })).filter((x) => x.hit.length).sort((a, b) => b.score - a.score).slice(0, 12).map((x) => getState(x.p.id, f.id));
   } else {
     const mine = db.projects.filter((p) => p.clientId === me.id && (!query.projectId || p.id === query.projectId) && matchingStatus(p) === 'DONE');
     items = mine.flatMap((p) => computeFor(p).map((x) => getState(p.id, x.f.id)));
