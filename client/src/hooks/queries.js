@@ -75,8 +75,7 @@ export const useEngagements = (enabled = true) => useQuery({ queryKey: ['engagem
 export const useEngagement = (id) => useQuery({ queryKey: ['engagement', id], queryFn: () => engagements.byId(id), enabled: !!id });
 const engKeys = [['engagements'], ['engagement'], ['conversations'], ['tier'], ['projects-me'], ['notifications']];
 export const useCreateEngagement = () => useInvalidating(engagements.create, engKeys);
-export const useEngagementStatus = () => useInvalidating(({ id, status }) => engagements.setStatus(id, status), engKeys);
-export const useAiDisclosure = () => useInvalidating(({ id, usedAi }) => engagements.setAiDisclosure(id, usedAi), [['engagement']]);
+export const useEngagementStatus = () => useInvalidating(({ id, status, usedAi }) => engagements.setStatus(id, status, usedAi), engKeys);
 export const useReview = () => useInvalidating(({ id, ...body }) => engagements.review(id, body), [['engagement'], ['freelancer'], ['freelancer-reviews']]);
 
 /* ---------- chat ---------- */

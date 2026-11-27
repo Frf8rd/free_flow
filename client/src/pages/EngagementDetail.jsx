@@ -8,7 +8,7 @@ import { Async, Avatar, BackLink, Card, Notice, SectionCard, SkeletonList, Stars
 import { Field, Textarea } from '../components/ui/Fields.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 import { useAuth } from '../store/authStore.js';
-import { useAiDisclosure, useEngagement, useEngagementStatus, useReview } from '../hooks/queries.js';
+import { useEngagement, useEngagementStatus, useReview } from '../hooks/queries.js';
 import { ENGAGEMENT_STATUS, formatDate, formatDateTime, formatMoney, timeAgo } from '../lib/format.js';
 import { statusTone } from './Engagements.jsx';
 
@@ -54,7 +54,7 @@ function Detail({ e }) {
   const user = useAuth((s) => s.user);
   const isClient = user.id === e.client.userId;
   const other = isClient ? e.freelancer : e.client;
-  const setStatus = useEngagementStatus(), disclose = useAiDisclosure();
+  const setStatus = useEngagementStatus();
   const { toast, error } = useToast();
   const [usedAi, setUsedAi] = useState(e.usedAi);
   const [confirm, setConfirm] = useState(null);
@@ -63,7 +63,7 @@ function Detail({ e }) {
   const act = async (status, msg) => { try { await setStatus.mutateAsync({ id: e.id, status }); toast(msg); setConfirm(null); } catch (x) { error(x); setConfirm(null); } };
   const deliver = async () => {
     if (usedAi == null) return error(new Error('Declară dacă ai folosit instrumente AI înainte de livrare.'));
-    try { await disclose.mutateAsync({ id: e.id, usedAi }); await setStatus.mutateAsync({ id: e.id, status: 'DELIVERED' }); toast('Lucrarea a fost marcată ca livrată.'); } catch (x) { error(x); }
+    try { await setStatus.mutateAsync({ id: e.id, status: 'DELIVERED', usedAi }); toast('Lucrarea a fost marcată ca livrată.'); } catch (x) { error(x); }
   };
   const canCancel = ['IN_PROGRESS', 'DELIVERED'].includes(e.status);
 
@@ -90,7 +90,7 @@ function Detail({ e }) {
             <fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium text-fm-ink">Ai folosit instrumente AI pentru această lucrare?</legend>
               {[[true, 'Da, am folosit AI'], [false, 'Nu, am lucrat fără AI']].map(([v, l]) => <label key={String(v)} className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm ${usedAi === v ? 'border-fm-accent-solid bg-fm-accent-solid/8' : 'border-fm-graphite/15'}`}><input type="radio" name="ai" checked={usedAi === v} onChange={() => setUsedAi(v)} className="accent-[rgb(var(--fm-accent-solid))]" />{l}</label>)}
             </fieldset>
-            <Button className="mt-4" loading={setStatus.isPending || disclose.isPending} onClick={deliver}>Marchează ca livrat</Button>
+            <Button className="mt-4" loading={setStatus.isPending} onClick={deliver}>Marchează ca livrat</Button>
           </SectionCard>
         )}
         {e.status === 'IN_PROGRESS' && isClient && <Notice icon="clock">Freelancerul lucrează la proiect. Vei fi anunțat când îl livrează.</Notice>}

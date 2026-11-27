@@ -14,6 +14,6 @@ function asEngagement(engagement) {
 export const mine = (p) => get('/engagements/me', p).then(asList).then((rows) => rows.map(asEngagement));
 export const byId = (id) => get(`/engagements/${id}`).then((response) => asEngagement(response?.data ?? response));
 export const create = (body) => post('/engagements', body); // { matchId, agreedPrice, deadline? }
-export const setStatus = (id, status) => patch(`/engagements/${id}/status`, { status });
+export const setStatus = (id, status, usedAi) => patch(`/engagements/${id}/status`, { status, ...(usedAi !== undefined ? { usedAi } : {}) });
 export const setAiDisclosure = (id, usedAi) => patch(`/engagements/${id}/ai-disclosure`, { usedAi });
 export const review = (id, body) => post(`/engagements/${id}/reviews`, body); // { rating, comment }

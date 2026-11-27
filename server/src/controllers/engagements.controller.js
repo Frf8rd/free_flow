@@ -29,7 +29,7 @@ async function getById(req, res) {
 }
 
 async function update(req, res) {
-  const engagement = await service.updateEngagement(req.user, req.params.id, req.body?.status);
+  const engagement = await service.updateEngagement(req.user, req.params.id, req.body);
   void notifications.notifyEngagementUpdated(engagement, req.user.id);
   const io = getIo();
   if (io) {

@@ -80,7 +80,8 @@ async function getEngagement(user, id, db = prisma) {
   return engagement;
 }
 
-async function updateEngagement(actor, id, status, db = prisma) {
+async function updateEngagement(actor, id, input, db = prisma) {
+  const { status, usedAi } = typeof input === "string" ? { status: input } : input ?? {};
   const actions = new Set(["IN_PROGRESS", "DELIVERED", "COMPLETED", "REJECTED", "CANCELLED"]);
   if (!id || !actions.has(status)) {
     throw new AppError(400, "VALIDATION_ERROR", "Starea solicitată pentru colaborare nu este validă.");
@@ -112,11 +113,15 @@ async function updateEngagement(actor, id, status, db = prisma) {
     if (status === "IN_PROGRESS" && item.project.status !== "OPEN") {
       throw new AppError(409, "PROJECT_NOT_OPEN", "Proiectul trebuie să fie deschis pentru a accepta cererea.");
     }
+    const deliveryDisclosure = usedAi === undefined ? item.usedAi : usedAi;
+    if (status === "DELIVERED" && typeof deliveryDisclosure !== "boolean") {
+      throw new AppError(400, "AI_DISCLOSURE_REQUIRED", "Alege dacă ai folosit instrumente AI pentru această lucrare.");
+    }
 
     const now = new Date();
     const data = {
       status,
-      ...(status === "DELIVERED" ? { deliveredAt: now } : {}),
+      ...(status === "DELIVERED" ? { deliveredAt: now, usedAi: deliveryDisclosure } : {}),
       ...(status === "COMPLETED" ? { completedAt: now } : {}),
       ...(status === "REJECTED" ? { rejectedAt: now } : {}),
       ...(status === "CANCELLED" ? { cancelledAt: now } : {}),

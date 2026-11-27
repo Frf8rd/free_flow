@@ -356,7 +356,11 @@ r('PATCH', '/engagements/:id/status', ({ me, params, body }) => {
   const ok = (isClient && e.status === 'PENDING' && ['IN_PROGRESS', 'REJECTED'].includes(to)) || (to === 'DELIVERED' && !isClient && e.status === 'IN_PROGRESS') || (to === 'COMPLETED' && isClient && e.status === 'DELIVERED') || (to === 'CANCELLED' && ['IN_PROGRESS', 'DELIVERED'].includes(e.status));
   if (!ok) throw new HttpError(409, 'Această schimbare de stare nu este permisă.', null, 'CONFLICT');
   if (to === 'IN_PROGRESS' && p.status !== 'OPEN') throw new HttpError(409, 'Proiectul nu mai acceptă colaborări.', null, 'CONFLICT');
-  if (to === 'DELIVERED' && e.usedAi == null) throw bad('Înainte de livrare, declară dacă ai folosit AI.', { usedAi: 'Declarația este obligatorie.' });
+  if (to === 'DELIVERED') {
+    const usedAi = body.usedAi === undefined ? e.usedAi : body.usedAi;
+    if (typeof usedAi !== 'boolean') throw bad('Alege dacă ai folosit instrumente AI pentru această lucrare.', { usedAi: 'Declarația este obligatorie.' });
+    e.usedAi = usedAi;
+  }
   e.status = to; const other = isClient ? f.userId : p.clientId;
   const match = db.matchStates.find((m) => m.id === e.matchId);
   if (to === 'IN_PROGRESS') { p.status = 'IN_PROGRESS'; if (match) match.status = 'ACCEPTED'; }
