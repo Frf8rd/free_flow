@@ -1,5 +1,6 @@
 const prisma = require('../../config/prisma');
 const { matchFreelancersForProject, matchProjectsForFreelancer } = require('./application');
+const { MAX_MATCHING_ATTEMPTS } = require('./jobs');
 
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const POLL_MS = Number(process.env.MATCHING_POLL_MS) || 3000;
@@ -30,7 +31,7 @@ async function processOne(db = prisma) {
       }
     } catch (error) {
       const attempts = candidate.attempts + 1;
-      const exhausted = attempts >= 5;
+      const exhausted = attempts >= MAX_MATCHING_ATTEMPTS;
       await db.matchingJob.update({
         where: { id: candidate.id },
         data: {

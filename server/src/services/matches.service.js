@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const { AppError } = require('../utils/errors');
-const { enqueueMatchingJob } = require('./matching/jobs');
+const { enqueueMatchingJob, MAX_MATCHING_ATTEMPTS } = require('./matching/jobs');
 const notifications = require('./notifications.service');
 
 const matchInclude = {
@@ -42,10 +42,16 @@ async function listForProject(user, projectId, db = prisma) {
   if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
   if (project.clientId !== user.id) throw new AppError(403, 'FORBIDDEN', 'Poți vedea potrivirile doar pentru proiectele tale.');
   const data = await db.match.findMany({ where: { projectId, clientDismissedAt: null, status: { not: 'DISMISSED' } }, include: matchListInclude, orderBy: [{ projectRank: 'asc' }, { score: 'desc' }] });
+  const status = project.matchingStatus || 'PENDING';
+  const job = ['DONE', 'FAILED'].includes(status) ? await db.matchingJob.findUnique({
+    where: { type_targetId: { type: 'PROJECT', targetId: projectId } },
+    select: { attempts: true },
+  }) : null;
+  const processing = job && job.attempts < MAX_MATCHING_ATTEMPTS;
   const extracted = project.extracted && typeof project.extracted === 'object' ? project.extracted : {};
   return {
-    status: project.matchingStatus || 'PENDING',
-    error: project.matchingError || null,
+    status: processing ? 'PENDING' : status,
+    error: !processing && status === 'FAILED' ? project.matchingError || null : null,
     data,
     analysis: {
       source: extracted.source || null,
@@ -156,13 +162,23 @@ async function recordImpressions(user, matchIds, db = prisma) {
 async function refresh(user, projectId, db = prisma) {
   if (user.role === 'CLIENT') {
     if (!projectId) throw new AppError(400, 'VALIDATION_ERROR', 'projectId este obligatoriu pentru client.');
-    const project = await db.project.findFirst({ where: { id: projectId, clientId: user.id }, select: { id: true, matchedAt: true } });
-    if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
-    const job = await db.matchingJob.findUnique({ where: { type_targetId: { type: 'PROJECT', targetId: project.id } }, select: { updatedAt: true } });
-    const lastRefresh = [project.matchedAt, job?.updatedAt].filter(Boolean).sort((a, b) => b.getTime() - a.getTime())[0];
-    if (lastRefresh && Date.now() - lastRefresh.getTime() < 120000) throw new AppError(429, 'MATCH_REFRESH_COOLDOWN', 'Așteaptă două minute înainte de o nouă actualizare.');
-    await enqueueMatchingJob('PROJECT', project.id, db);
-    return { queued: true, projectId: project.id };
+    const queueProject = async (tx) => {
+      const project = await tx.project.findFirst({ where: { id: projectId, clientId: user.id }, select: { id: true, status: true, matchedAt: true } });
+      if (!project) throw new AppError(404, 'PROJECT_NOT_FOUND', 'Proiectul nu a fost găsit.');
+      if (project.status !== 'OPEN') throw new AppError(409, 'PROJECT_NOT_OPEN', 'Potrivirile pot fi actualizate doar pentru proiecte deschise.');
+      const job = await tx.matchingJob.findUnique({ where: { type_targetId: { type: 'PROJECT', targetId: project.id } }, select: { updatedAt: true, attempts: true } });
+      if (job && job.attempts < MAX_MATCHING_ATTEMPTS) return { queued: true, projectId: project.id };
+      const lastRefresh = Math.max(project.matchedAt?.getTime() ?? 0, job?.updatedAt?.getTime() ?? 0);
+      if (Date.now() - lastRefresh < 120000) throw new AppError(429, 'MATCH_REFRESH_COOLDOWN', 'Așteaptă două minute înainte de o nouă actualizare.');
+      const updated = await tx.project.updateMany({
+        where: { id: project.id, status: 'OPEN' },
+        data: { matchingStatus: 'PENDING', matchingError: null },
+      });
+      if (!updated.count) throw new AppError(409, 'PROJECT_NOT_OPEN', 'Potrivirile pot fi actualizate doar pentru proiecte deschise.');
+      await enqueueMatchingJob('PROJECT', project.id, tx);
+      return { queued: true, projectId: project.id };
+    };
+    return db === prisma ? db.$transaction(queueProject) : queueProject(db);
   }
   const profile = await db.freelancerProfile.findUnique({ where: { userId: user.id }, select: { id: true, matchedAt: true } });
   const job = await db.matchingJob.findUnique({ where: { type_targetId: { type: 'FREELANCER', targetId: user.id } }, select: { updatedAt: true } });

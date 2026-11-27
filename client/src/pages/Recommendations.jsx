@@ -11,6 +11,25 @@ import { profileCompleteness } from '../lib/profile.js';
 import { useSession } from '../lib/session.jsx';
 import { useToast } from '../components/feedback/Toast.jsx';
 
+function SearchStatus({ status, refreshing, count, projectId }) {
+  if (refreshing || status === 'PENDING' || status === 'RUNNING') {
+    return <Card className="p-4 text-sm text-fm-slate/75" role="status">
+      <span aria-hidden="true" className="mr-2 inline-block h-3 w-3 animate-spin border-2 border-fm-graphite/25 border-t-fm-accent" />
+      {refreshing ? 'Se solicită actualizarea…' : status === 'RUNNING' ? 'Se caută freelanceri potriviți…' : 'Căutarea este în așteptare. Rezultatul va apărea automat.'}
+    </Card>;
+  }
+  if (status === 'FAILED') {
+    return <Card role="alert"><Empty icon="alert" title="Căutarea nu s-a putut finaliza" text="Apasă «Actualizează potrivirile» pentru a încerca din nou." /></Card>;
+  }
+  if (count === 0) {
+    return <Card role="status"><Empty icon="search" title="Căutare finalizată · 0 potriviri" text="Nu există recomandări de afișat pentru acest proiect. Poți revizui abilitățile cerute, bugetul sau termenul."
+      action={<Link to={`/projects/${projectId}/edit`} className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">Editează proiectul</Link>} /></Card>;
+  }
+  return <Card className="p-4 text-sm font-semibold text-fm-ink" role="status">
+    Căutare finalizată · {count} {count === 1 ? 'potrivire găsită' : count >= 20 ? 'de potriviri găsite' : 'potriviri găsite'}
+  </Card>;
+}
+
 export default function Recommendations() {
   const { mode } = useSession();
   const navigate = useNavigate();
@@ -30,13 +49,16 @@ export default function Recommendations() {
   const result = isClient ? clientMatches : freelancerMatches;
   const rows = isClient ? (clientMatches.data?.data || []) : (freelancerMatches.data?.data || []);
   const showProfileHint = !isClient && freelancerProfile.isSuccess && profileCompleteness(freelancerProfile.data).percent < 100;
+  const refreshing = Boolean(selected && refresh.isPending && refresh.variables === selected.id);
+  const searchStatus = clientMatches.data?.status;
+  const searching = refreshing || ['PENDING', 'RUNNING'].includes(searchStatus);
+  const refreshError = selected && refresh.variables === selected.id ? refresh.error : null;
 
   const changeProject = (value) => { const next = new URLSearchParams(params); next.delete('projectId'); value ? next.set('project', value) : next.delete('project'); setParams(next, { replace: true }); };
   const act = async (mutation, vars, message, goToConversation = false) => { try { const data = await mutation.mutateAsync(vars); toast(message); if (goToConversation && data?.conversationId) navigate(`/messages/${data.conversationId}`); } catch (e) { error(e); } };
-  const refreshMatches = async () => { if (!selected) return; try { await refresh.mutateAsync(selected.id); toast('Potrivirile se actualizează.'); } catch (e) { error(e); } };
 
   const title = isClient ? 'Freelanceri potriviți' : 'Potriviri pentru tine';
-  return <PageShell title={title} subtitle={isClient ? 'Primești o listă scurtă, cu explicații pentru fiecare recomandare.' : 'Proiectele sunt selectate după abilități, nivel, disponibilitate și buget.'} action={isClient && selected && <Button variant="outline" onClick={refreshMatches} loading={refresh.isPending}><Icon name="repeat" className="h-4 w-4" />Actualizează potrivirile</Button>}>
+  return <PageShell title={title} subtitle={isClient ? 'Primești o listă scurtă, cu explicații pentru fiecare recomandare.' : 'Proiectele sunt selectate după abilități, nivel, disponibilitate și buget.'} action={isClient && selected && <Button variant="outline" onClick={() => refresh.mutate(selected.id)} disabled={searching || refresh.isPending}><Icon name="repeat" className="h-4 w-4" />Actualizează potrivirile</Button>}>
     <div className="grid gap-4">
       {!isClient && <Async q={freelancerInvites}>{({ data }) => data.length > 0 && (
         <section className="grid gap-3" aria-labelledby="received-invites">
@@ -47,15 +69,14 @@ export default function Recommendations() {
       {!isClient && freelancerInvites.data?.data.length > 0 && <h2 className="text-lg font-semibold text-fm-ink">Recomandări noi</h2>}
       {isClient && <Async q={projects}>{() => clientProjects.length ? <Card className="flex flex-wrap items-center gap-3 p-4"><label className="min-w-52 flex-1 text-sm font-semibold text-fm-ink">Proiect<Select className="mt-1.5" value={selected?.id || ''} onChange={(event) => changeProject(event.target.value)} options={[...(!selected ? [{ value: '', label: 'Alege un proiect' }] : []), ...clientProjects.map((p) => ({ value: p.id, label: p.title }))]} /></label><Link to="/projects/mine" className="pt-5 text-sm font-semibold text-fm-accent hover:underline">Gestionează proiectele</Link></Card> : <Card><Empty icon="folder" title="Postează un proiect pentru a vedea potriviri" text="După publicare, sistemul caută freelanceri potriviți." action={<Link to="/projects/new" className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">Postează proiect</Link>} /></Card>}</Async>}
       {isClient && selected && clientMatches.data?.analysis?.questions?.length > 0 && <Notice tone="info" icon="info"><b>Detalii care pot îmbunătăți potrivirea</b><ul className="mt-2 list-disc pl-5">{clientMatches.data.analysis.questions.map((question) => <li key={question}>{question}</li>)}</ul></Notice>}
-      {isClient && selected && ['PENDING', 'RUNNING'].includes(clientMatches.data?.status) && <Card className="p-4 text-sm text-fm-slate/75"><span className="mr-2 inline-block h-3 w-3 animate-spin border-2 border-fm-graphite/25 border-t-fm-accent" />Se caută freelanceri potriviți. Lista se actualizează automat.</Card>}
-      {isClient && clientMatches.data?.status === 'FAILED' && <Card><Empty icon="alert" title="Potrivirile nu au putut fi calculate" text="Poți încerca din nou după ce verifici detaliile proiectului." /></Card>}
+      {refreshError && <Notice tone="warn" icon="info"><span role="alert">{refreshError.message}</span></Notice>}
       {isClient && projects.isSuccess && projectId && !selected && <Notice tone="warn" icon="info">Proiectul din acest link nu este în lista proiectelor tale deschise.</Notice>}
-      {(!isClient || selected) && <Async q={result}>{() => rows.length === 0 ? <Card><Empty
+      {isClient && selected && refreshing && <SearchStatus refreshing />}
+      {isClient && selected && !refreshing && <Async q={clientMatches}>{() => <SearchStatus status={searchStatus} count={rows.length} projectId={selected.id} />}</Async>}
+      {(!isClient || (selected && searchStatus === 'DONE' && !searching && !clientMatches.isError && rows.length > 0)) && <Async q={result}>{() => rows.length === 0 ? <Card><Empty
         icon="sparkle"
-        title={isClient ? 'Nicio potrivire afișată încă' : 'Nu ai potriviri noi'}
-        text={isClient
-          ? 'Lasă sistemului câteva momente să proceseze proiectul.'
-          : showProfileHint
+        title="Nu ai potriviri noi"
+        text={showProfileHint
             ? 'Poți completa abilitățile și exemplele de lucru pentru a îmbunătăți recomandările.'
             : 'Momentan nu sunt recomandări noi pentru profilul tău. Poți căuta proiecte deschise în catalog.'}
         action={!isClient && <Link to={showProfileHint ? '/profile/edit' : '/browse'} className="bg-fm-ink px-4 py-2.5 text-sm font-semibold text-white">{showProfileHint ? 'Editează profilul' : 'Explorează proiecte'}</Link>}

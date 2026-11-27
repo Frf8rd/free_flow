@@ -1,4 +1,5 @@
 const prisma = require('../../config/prisma');
+const MAX_MATCHING_ATTEMPTS = 5;
 
 async function enqueueMatchingJob(type, targetId, db = prisma) {
   if (!['PROJECT', 'FREELANCER'].includes(type) || typeof targetId !== 'string' || !targetId.trim()) {
@@ -12,4 +13,4 @@ async function enqueueMatchingJob(type, targetId, db = prisma) {
   });
 }
 
-module.exports = { enqueueMatchingJob };
+module.exports = { enqueueMatchingJob, MAX_MATCHING_ATTEMPTS };

@@ -69,7 +69,17 @@ export const useInterest = () => useInvalidating(matches.interest, matchKeys);
 export const useInvite = () => useInvalidating(matches.invite, matchKeys);
 export const useInviteManual = () => useInvalidating(matches.inviteManual, matchKeys);
 export const useDismiss = () => useInvalidating(({ id, reason }) => matches.dismiss(id, reason), matchKeys);
-export const useRefreshMatches = () => useInvalidating(matches.refresh, [['project-matches'], ['matches-me'], ['projects-me']]);
+export function useRefreshMatches() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: matches.refresh,
+    onSuccess: (_data, projectId) => Promise.all([
+      qc.invalidateQueries({ queryKey: ['project-matches', projectId] }),
+      qc.invalidateQueries({ queryKey: ['matches-me'] }),
+      qc.invalidateQueries({ queryKey: ['projects-me'] }),
+    ]),
+  });
+}
 
 /* ---------- colaborări ---------- */
 export const useEngagements = (enabled = true) => useQuery({ queryKey: ['engagements'], queryFn: () => engagements.mine(), enabled });
