@@ -32,7 +32,7 @@ export default function ImageUpload({ value, onChange, purpose = 'portfolio', sh
   );
 
   return (
-    <div>
+    <div className="relative">
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={pick} aria-label={label || 'Încarcă imagine'} />
       {shape === 'round' ? (
         <div className="flex items-center gap-4">

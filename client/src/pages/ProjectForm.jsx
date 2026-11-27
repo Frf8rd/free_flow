@@ -23,10 +23,12 @@ function Form({ project }) {
   const cats = useCategories();
   const { error: showError } = useToast();
   const [imageFiles, setImageFiles] = useState([]);
+  const [skillsCleared, setSkillsCleared] = useState(false);
   const draft = !project ? readDraft() : null;
   const f = useForm(projectSchema, {
     title: project?.title || '', description: project?.description || draft?.description || '', categoryId: project?.categoryId || '',
-    budgetMin: project?.budgetMin ?? '', budgetMax: project?.budgetMax ?? '', deadline: toInputDate(project?.deadline), skillIds: project?.skills?.map((s) => s.id) || [],
+    budgetMin: project?.budgetMin ?? '', budgetMax: project?.budgetMax ?? '', deadline: toInputDate(project?.deadline),
+    skillIds: (project?.skills ?? []).filter((skill) => skill.source !== 'AI' && (!skill.categoryId || skill.categoryId === project.categoryId)).map((skill) => skill.id),
   });
   const [more, setMore] = useState(!!(project?.budgetMin || project?.budgetMax || project?.deadline || project?.skills?.length));
   useEffect(() => { if (!project) track('project_form_opened', { fromDraft: !!draft }); }, []); // eslint-disable-line
@@ -54,6 +56,13 @@ function Form({ project }) {
     }
   });
   const len = f.values.description.length;
+  const changeCategory = (categoryId) => {
+    if (categoryId === f.values.categoryId) return;
+    setSkillsCleared(f.values.skillIds.length > 0);
+    f.set('categoryId', categoryId);
+    f.set('skillIds', []);
+    f.setFormError('');
+  };
 
   return (
     <>
@@ -66,7 +75,8 @@ function Form({ project }) {
           </Field>
           <div>
             <p className="mb-2 text-sm font-medium text-fm-ink">Categorie</p>
-            <ChipPicker multiple={false} options={(cats.data || []).map((c) => ({ value: c.id, label: c.name }))} value={f.values.categoryId} onChange={(v) => f.set('categoryId', v)} />
+            <ChipPicker multiple={false} options={(cats.data || []).map((c) => ({ value: c.id, label: c.name }))} value={f.values.categoryId} onChange={changeCategory} />
+            {skillsCleared && <p role="status" className="mt-2 text-xs text-fm-slate/70">Selecția de abilități a fost resetată când ai schimbat categoria.</p>}
             {cats.isError && <span className="mt-1 block text-xs text-red-500">Nu am putut încărca categoriile.</span>}
             {f.errors.categoryId && <span role="alert" className="mt-1 block text-xs text-red-500">{f.errors.categoryId}</span>}
           </div>
@@ -83,7 +93,7 @@ function Form({ project }) {
                 <Field label={`Buget maxim (${currencySymbol()})`} optional error={f.errors.budgetMax}><Text type="number" min="0" inputMode="numeric" error={f.errors.budgetMax} {...f.bind('budgetMax')} /></Field>
                 <Field label="Termen" optional error={f.errors.deadline}><Text type="date" min={toInputDate(new Date())} error={f.errors.deadline} {...f.bind('deadline')} /></Field>
               </div>
-              <div><p className="mb-2 text-sm font-medium text-fm-ink">Abilități cerute <span className="text-xs font-normal text-fm-slate/50">opțional · le deducem și noi din descriere</span></p><SkillSelector value={f.values.skillIds} onChange={(v) => f.set('skillIds', v)} max={15} /></div>
+              <div><p className="mb-2 text-sm font-medium text-fm-ink">Abilități cerute <span className="text-xs font-normal text-fm-slate/50">opțional · le deducem și noi din descriere</span></p><SkillSelector key={f.values.categoryId} fixedCategoryId={f.values.categoryId} value={f.values.skillIds} onChange={(v) => { f.set('skillIds', v); setSkillsCleared(false); }} max={15} /></div>
             </div>
           )}
           <div className="border-t border-fm-ink/10 pt-5">

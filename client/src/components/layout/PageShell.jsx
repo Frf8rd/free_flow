@@ -10,7 +10,7 @@ export default function PageShell({ title, subtitle, action, children, width = '
   }, [docTitle, title]);
   return (
     <AppLayout>
-      <div className="thin-scroll min-h-0 flex-1 overflow-y-auto bg-fm-mist/25">
+      <div className="thin-scroll relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-fm-mist/25">
         <div className={`mx-auto w-full ${width} p-3 sm:px-6 sm:py-5`}>
           <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">

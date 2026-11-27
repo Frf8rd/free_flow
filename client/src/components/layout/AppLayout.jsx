@@ -42,7 +42,7 @@ export default function AppLayout({ children }) {
   }, []);
 
   return (
-    <div className="flex h-dvh">
+    <div className="relative flex h-dvh overflow-hidden overscroll-none">
      {/* Fundalul selectat rămâne vizibil în spatele conținutului pe toate rutele. */}
      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-fm-page/75" style={{ backgroundImage: dashboardBackgroundUrl ? `url("${dashboardBackgroundUrl}")` : background || undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <aside aria-label="Bară laterală" className={`fm-dark hidden shrink-0 bg-fm-ink transition-[width] duration-200 ease-out lg:block ${collapsed ? 'w-[76px]' : 'w-72'}`}>

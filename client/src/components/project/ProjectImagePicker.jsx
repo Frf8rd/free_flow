@@ -21,7 +21,7 @@ export default function ProjectImagePicker({ files, onChange, error }) {
         <p className="text-sm font-medium text-fm-ink">Imagini proiect <span className="text-xs font-normal text-fm-slate/60">opțional · maximum 8</span></p>
         <p className="mt-1 text-xs text-fm-slate/65">JPG, PNG sau WebP · maximum 5 MB fiecare</p>
       </div>
-      <label className="inline-flex cursor-pointer items-center gap-2 border border-fm-graphite/25 px-3 py-2 text-sm font-semibold text-fm-ink hover:bg-fm-mist/50">
+      <label className="relative inline-flex cursor-pointer items-center gap-2 border border-fm-graphite/25 px-3 py-2 text-sm font-semibold text-fm-ink hover:bg-fm-mist/50 focus-within:ring-2 focus-within:ring-fm-accent">
         <Icon name="image" className="h-4 w-4" /> Alege imagini
         <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={add} disabled={files.length >= 8} />
       </label>

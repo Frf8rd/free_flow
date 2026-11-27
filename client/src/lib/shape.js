@@ -3,7 +3,7 @@ export const asList = (d) => (Array.isArray(d) ? d : d?.data ?? []);
 const matchSkills = (rows) => (rows ?? []).map((row) => row.skill ?? row).filter((skill) => skill?.name);
 export const asProject = (project) => ({
   ...project,
-  skills: matchSkills(project.skills),
+  skills: matchSkills(project.skills?.map((entry) => entry.skill ? { ...entry.skill, source: entry.source } : entry)),
   matchesCount: project.matchesCount ?? project._count?.matches,
 });
 export function asMatch(match) {
